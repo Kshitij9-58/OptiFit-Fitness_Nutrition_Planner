@@ -1,0 +1,12 @@
+# Python / Backend
+backend/venv/
+backend/__pycache__/
+backend/optifit.db
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+
+# System
+.DS_Store
+.env
