@@ -14,7 +14,8 @@ export default function App() {
     e.preventDefault();
     setLoading(true); setError(''); setPlan(null);
     try {
-      const response = await fetch('http://127.0.0.1:8000/generate/', {
+      // ⚠️ REPLACE THE URL BELOW WITH YOUR ACTUAL RENDER API LINK ⚠️
+      const response = await fetch('https://optifit-fitness-nutrition-planner.onrender.com/generate/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -31,10 +32,9 @@ export default function App() {
       if (!response.ok) throw new Error('Failed to generate optimization plan.');
       
       const data = await response.json();
-      // The backend now sends a deeply nested JSON string, so we parse it
       setPlan(JSON.parse(data.generated_plan));
     } catch (err) {
-      setError(err.message || 'Server connection error.');
+      setError(err.message || 'Server connection error. Check API URL.');
     } finally {
       setLoading(false);
     }
