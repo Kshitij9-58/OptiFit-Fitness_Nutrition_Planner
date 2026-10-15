@@ -1,0 +1,93 @@
+{
+  "_schema": {
+    "key": "gender|goal|bmi_category, lowercased",
+    "minimal_determining_keys": [
+      [
+        "BMI Category"
+      ]
+    ],
+    "source_rows": 80000
+  },
+  "plans": {
+    "female|fat_burn|normal weight": {
+      "exercise_schedule": "Moderate cardio, Strength training, and 5000 steps walking",
+      "meal_plan": "Balanced diet with moderate protein and carbohydrates: Chicken breast, brown rice, spinach, eggs, apple",
+      "meal_plan_vegetarian": null
+    },
+    "female|fat_burn|obesity": {
+      "exercise_schedule": "Low-impact cardio, Swimming, and 10000 steps walking",
+      "meal_plan": "Low-calorie, nutrient-dense diet with portion control: carrot sticks,grilled chicken breast,steamed broccoli, Greek yogurt, mixed nuts, baked salmon, leafy greens, roasted sweet potatoes",
+      "meal_plan_vegetarian": null
+    },
+    "female|fat_burn|overweight": {
+      "exercise_schedule": "High-intensity interval training (HIIT), Cardio, and 8000 steps walking",
+      "meal_plan": "Low-carb, high-fiber diet: Avocado, grilled fish, broccoli, almonds, leafy greens",
+      "meal_plan_vegetarian": null
+    },
+    "female|fat_burn|underweight": {
+      "exercise_schedule": "Light weightlifting, Yoga, and 2000 steps walking",
+      "meal_plan": "High-calorie, protein-rich diet: Whole milk, peanut butter, eggs, salmon, sweet potatoes",
+      "meal_plan_vegetarian": null
+    },
+    "female|muscle_gain|normal weight": {
+      "exercise_schedule": "Moderate cardio, Strength training, and 5000 steps walking",
+      "meal_plan": "Balanced diet with moderate protein and carbohydrates: Chicken breast, brown rice, spinach, eggs, apple",
+      "meal_plan_vegetarian": null
+    },
+    "female|muscle_gain|obesity": {
+      "exercise_schedule": "Low-impact cardio, Swimming, and 10000 steps walking",
+      "meal_plan": "Low-calorie, nutrient-dense diet with portion control: carrot sticks,grilled chicken breast,steamed broccoli, Greek yogurt, mixed nuts, baked salmon, leafy greens, roasted sweet potatoes",
+      "meal_plan_vegetarian": null
+    },
+    "female|muscle_gain|overweight": {
+      "exercise_schedule": "High-intensity interval training (HIIT), Cardio, and 8000 steps walking",
+      "meal_plan": "Low-carb, high-fiber diet: Avocado, grilled fish, broccoli, almonds, leafy greens",
+      "meal_plan_vegetarian": null
+    },
+    "female|muscle_gain|underweight": {
+      "exercise_schedule": "Light weightlifting, Yoga, and 2000 steps walking",
+      "meal_plan": "High-calorie, protein-rich diet: Whole milk, peanut butter, eggs, salmon, sweet potatoes",
+      "meal_plan_vegetarian": null
+    },
+    "male|fat_burn|normal weight": {
+      "exercise_schedule": "Moderate cardio, Strength training, and 5000 steps walking",
+      "meal_plan": "Balanced diet with moderate protein and carbohydrates: Chicken breast, brown rice, spinach, eggs, apple",
+      "meal_plan_vegetarian": null
+    },
+    "male|fat_burn|obesity": {
+      "exercise_schedule": "Low-impact cardio, Swimming, and 10000 steps walking",
+      "meal_plan": "Low-calorie, nutrient-dense diet with portion control: carrot sticks,grilled chicken breast,steamed broccoli, Greek yogurt, mixed nuts, baked salmon, leafy greens, roasted sweet potatoes",
+      "meal_plan_vegetarian": null
+    },
+    "male|fat_burn|overweight": {
+      "exercise_schedule": "High-intensity interval training (HIIT), Cardio, and 8000 steps walking",
+      "meal_plan": "Low-carb, high-fiber diet: Avocado, grilled fish, broccoli, almonds, leafy greens",
+      "meal_plan_vegetarian": null
+    },
+    "male|fat_burn|underweight": {
+      "exercise_schedule": "Light weightlifting, Yoga, and 2000 steps walking",
+      "meal_plan": "High-calorie, protein-rich diet: Whole milk, peanut butter, eggs, salmon, sweet potatoes",
+      "meal_plan_vegetarian": null
+    },
+    "male|muscle_gain|normal weight": {
+      "exercise_schedule": "Moderate cardio, Strength training, and 5000 steps walking",
+      "meal_plan": "Balanced diet with moderate protein and carbohydrates: Chicken breast, brown rice, spinach, eggs, apple",
+      "meal_plan_vegetarian": null
+    },
+    "male|muscle_gain|obesity": {
+      "exercise_schedule": "Low-impact cardio, Swimming, and 10000 steps walking",
+      "meal_plan": "Low-calorie, nutrient-dense diet with portion control: carrot sticks,grilled chicken breast,steamed broccoli, Greek yogurt, mixed nuts, baked salmon, leafy greens, roasted sweet potatoes",
+      "meal_plan_vegetarian": null
+    },
+    "male|muscle_gain|overweight": {
+      "exercise_schedule": "High-intensity interval training (HIIT), Cardio, and 8000 steps walking",
+      "meal_plan": "Low-carb, high-fiber diet: Avocado, grilled fish, broccoli, almonds, leafy greens",
+      "meal_plan_vegetarian": null
+    },
+    "male|muscle_gain|underweight": {
+      "exercise_schedule": "Light weightlifting, Yoga, and 2000 steps walking",
+      "meal_plan": "High-calorie, protein-rich diet: Whole milk, peanut butter, eggs, salmon, sweet potatoes",
+      "meal_plan_vegetarian": null
+    }
+  }
+}
