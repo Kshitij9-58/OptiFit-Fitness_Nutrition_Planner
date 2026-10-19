@@ -69,15 +69,6 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   }, []);
 
-  const signInWithProvider = useCallback(async (provider) => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider, // 'google' | 'apple'
-      options: { redirectTo: window.location.origin },
-    });
-    if (error) throw error;
-    // No return value: the browser navigates away to the provider.
-  }, []);
-
   const sendPasswordReset = useCallback(async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset`,
@@ -104,11 +95,10 @@ export function AuthProvider({ children }) {
     authConfigured,
     signUpWithEmail,
     signInWithEmail,
-    signInWithProvider,
     sendPasswordReset,
     signOut,
     getAccessToken,
-  }), [session, loading, signUpWithEmail, signInWithEmail, signInWithProvider,
+  }), [session, loading, signUpWithEmail, signInWithEmail,
        sendPasswordReset, signOut, getAccessToken]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -144,17 +134,17 @@ export function describeAuthError(error) {
   if (message.includes('already registered') || message.includes('already been registered')) {
     return 'An account with that email already exists. Try signing in instead.';
   }
-  if (message.includes('password should be')) {
-    return 'Your password needs to be at least 6 characters.';
+  if (message.includes('password should be') || message.includes('password is too short')) {
+    return 'Your password needs to be at least 8 characters.';
+  }
+  if (message.includes('weak') || message.includes('pwned')) {
+    return 'That password is too easy to guess. Try a longer phrase.';
   }
   if (message.includes('email not confirmed')) {
     return 'Check your inbox and confirm your email address first.';
   }
   if (message.includes('rate limit') || message.includes('too many')) {
     return 'Too many attempts. Wait a minute and try again.';
-  }
-  if (message.includes('provider is not enabled')) {
-    return 'That sign-in method is not switched on yet.';
   }
   return error?.message || 'Something went wrong. Please try again.';
 }

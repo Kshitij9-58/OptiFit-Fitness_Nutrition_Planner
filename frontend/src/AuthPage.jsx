@@ -16,25 +16,6 @@ function Mark({ className = '' }) {
   );
 }
 
-function GoogleIcon() {
-  return (
-    <svg viewBox="0 0 18 18" className="w-[18px] h-[18px]" aria-hidden="true">
-      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" />
-      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z" />
-      <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z" />
-      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" />
-    </svg>
-  );
-}
-
-function AppleIcon() {
-  return (
-    <svg viewBox="0 0 16 18" className="w-[17px] h-[17px]" fill="currentColor" aria-hidden="true">
-      <path d="M13.3 9.5c0-2 1.6-3 1.7-3-.9-1.4-2.4-1.5-2.9-1.6-1.2-.1-2.4.7-3 .7s-1.6-.7-2.6-.7c-1.3 0-2.6.8-3.2 2-1.4 2.4-.4 6 1 8 .7 1 1.5 2 2.5 2 1 0 1.4-.6 2.6-.6s1.5.6 2.6.6c1.1 0 1.8-1 2.4-2 .8-1.1 1.1-2.2 1.1-2.3 0 0-2.2-.8-2.2-3.1zM11.4 3.2c.5-.7.9-1.6.8-2.6-.8 0-1.8.5-2.4 1.2-.5.6-1 1.6-.8 2.5.9.1 1.8-.4 2.4-1.1z" />
-    </svg>
-  );
-}
-
 function Spinner() {
   return (
     <svg viewBox="0 0 16 16" className="w-4 h-4 animate-spin" aria-hidden="true">
@@ -55,14 +36,14 @@ const inputClass =
  * onSkip: lets people use the calculator without an account.
  */
 export default function AuthPage({ initialMode = 'signin', onDone, onSkip }) {
-  const { signInWithEmail, signUpWithEmail, signInWithProvider, sendPasswordReset,
+  const { signInWithEmail, signUpWithEmail, sendPasswordReset,
           authConfigured } = useAuth();
 
   const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [busy, setBusy] = useState('');       // '', 'email', 'google', 'apple', 'reset'
+  const [busy, setBusy] = useState('');       // '', 'email', 'reset'
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -85,17 +66,6 @@ export default function AuthPage({ initialMode = 'signin', onDone, onSkip }) {
     } catch (err) {
       setError(describeAuthError(err));
     } finally {
-      setBusy('');
-    }
-  };
-
-  const oauth = async (provider) => {
-    setError(''); setNotice(''); setBusy(provider);
-    try {
-      await signInWithProvider(provider);
-      // The browser leaves the page here; no success path to handle.
-    } catch (err) {
-      setError(describeAuthError(err));
       setBusy('');
     }
   };
@@ -178,31 +148,7 @@ export default function AuthPage({ initialMode = 'signin', onDone, onSkip }) {
             </p>
           )}
 
-          <fieldset disabled={!authConfigured || Boolean(busy)} className="mt-8 space-y-3">
-            <button type="button" onClick={() => oauth('google')}
-              className="w-full flex items-center justify-center gap-3 bg-white border border-[#D9D6CD]
-                         hover:border-[#B9B5AA] rounded-lg py-3 text-[14px] font-bold
-                         transition-colors disabled:opacity-60">
-              {busy === 'google' ? <Spinner /> : <GoogleIcon />}
-              Continue with Google
-            </button>
-
-            <button type="button" onClick={() => oauth('apple')}
-              className="w-full flex items-center justify-center gap-3 bg-[#141815] text-white
-                         hover:bg-[#2A2F2B] rounded-lg py-3 text-[14px] font-bold
-                         transition-colors disabled:opacity-60">
-              {busy === 'apple' ? <Spinner /> : <AppleIcon />}
-              Continue with Apple
-            </button>
-          </fieldset>
-
-          <div className="flex items-center gap-4 my-7" aria-hidden="true">
-            <div className="h-px bg-[#E3E1DA] flex-1" />
-            <span className="text-[11px] font-bold text-[#9DA29E]">or use email</span>
-            <div className="h-px bg-[#E3E1DA] flex-1" />
-          </div>
-
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} className="mt-8 space-y-4">
             <div>
               <label htmlFor="email" className="block text-[12px] font-bold mb-1.5">
                 Email address
@@ -222,16 +168,16 @@ export default function AuthPage({ initialMode = 'signin', onDone, onSkip }) {
                 </button>
               </div>
               <input id="password" type={showPassword ? 'text' : 'password'} required
-                minLength={6}
+                minLength={8}
                 autoComplete={isSignup ? 'new-password' : 'current-password'}
                 value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder={isSignup ? 'At least 6 characters' : ''}
+                placeholder={isSignup ? 'At least 8 characters' : ''}
                 className={inputClass}
                 disabled={!authConfigured || Boolean(busy)} />
               {isSignup && (
                 <p className="text-[11px] text-[#6E756F] mt-1.5">
-                  Six characters minimum. A phrase you will actually remember beats
-                  something clever.
+                  Eight characters minimum. Three random words you will actually
+                  remember beat one clever word with symbols in it.
                 </p>
               )}
             </div>
