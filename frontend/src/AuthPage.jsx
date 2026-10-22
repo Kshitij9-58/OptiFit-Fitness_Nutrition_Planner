@@ -36,33 +36,53 @@ const inputClass =
  * onSkip: lets people use the calculator without an account.
  */
 export default function AuthPage({ initialMode = 'signin', onDone, onSkip }) {
-  const { signInWithEmail, signUpWithEmail, sendPasswordReset,
+  const { signInWithEmail, signUpWithEmail, resendConfirmation, sendPasswordReset,
           authConfigured } = useAuth();
 
   const [mode, setMode] = useState(initialMode);
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState('');       // '', 'email', 'reset'
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [pendingConfirm, setPendingConfirm] = useState(false);
 
   const isSignup = mode === 'signup';
 
   const submit = async (e) => {
     e.preventDefault();
+    // The browser's "required" accepts a name made only of spaces.
+    if (isSignup && !fullName.trim()) {
+      setError('Please enter your name.');
+      return;
+    }
     setError(''); setNotice(''); setBusy('email');
     try {
       if (isSignup) {
-        const { needsConfirmation } = await signUpWithEmail(email, password);
+        const { needsConfirmation } = await signUpWithEmail(email, password, fullName);
         if (needsConfirmation) {
-          setNotice(`Check ${email} for a confirmation link. You can close this page.`);
+          setPendingConfirm(true);
+          setNotice(`We sent a confirmation link to ${email}. Check your spam folder too. Once you confirm, sign in and we will greet you by name.`);
           return;
         }
       } else {
         await signInWithEmail(email, password);
       }
       onDone?.();
+    } catch (err) {
+      setError(describeAuthError(err));
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const resend = async () => {
+    setError(''); setBusy('resend');
+    try {
+      await resendConfirmation(email);
+      setNotice(`Sent again to ${email}. It can take a minute to arrive.`);
     } catch (err) {
       setError(describeAuthError(err));
     } finally {
@@ -149,6 +169,19 @@ export default function AuthPage({ initialMode = 'signin', onDone, onSkip }) {
           )}
 
           <form onSubmit={submit} className="mt-8 space-y-4">
+            {isSignup && (
+              <div>
+                <label htmlFor="fullName" className="block text-[12px] font-bold mb-1.5">
+                  Your name
+                </label>
+                <input id="fullName" type="text" required autoComplete="name"
+                  maxLength={60}
+                  value={fullName} onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Alex Johnson" className={inputClass}
+                  disabled={!authConfigured || Boolean(busy)} />
+              </div>
+            )}
+
             <div>
               <label htmlFor="email" className="block text-[12px] font-bold mb-1.5">
                 Email address
@@ -192,6 +225,12 @@ export default function AuthPage({ initialMode = 'signin', onDone, onSkip }) {
                 {notice}
               </p>
             )}
+            {pendingConfirm && isSignup && (
+              <button type="button" onClick={resend} disabled={Boolean(busy)}
+                className="text-[12.5px] font-bold text-[#FF5A1F] hover:underline disabled:opacity-50">
+                {busy === 'resend' ? 'Sending' : 'Did not get it? Resend the email'}
+              </button>
+            )}
 
             <button type="submit" disabled={!authConfigured || Boolean(busy)}
               className="w-full flex items-center justify-center gap-2 bg-[#10231F] hover:bg-[#17352D]
@@ -212,7 +251,7 @@ export default function AuthPage({ initialMode = 'signin', onDone, onSkip }) {
           <p className="text-[13px] text-[#6E756F] mt-8">
             {isSignup ? 'Already have an account?' : 'New here?'}{' '}
             <button type="button"
-              onClick={() => { setMode(isSignup ? 'signin' : 'signup'); setError(''); setNotice(''); }}
+              onClick={() => { setMode(isSignup ? 'signin' : 'signup'); setError(''); setNotice(''); setPendingConfirm(false); }}
               className="font-bold text-[#FF5A1F] hover:underline">
               {isSignup ? 'Sign in' : 'Create one'}
             </button>

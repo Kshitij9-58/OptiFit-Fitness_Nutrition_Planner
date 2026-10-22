@@ -27,6 +27,21 @@ export const supabase = authConfigured
     })
   : null;
 
+/**
+ * First name for greetings and the header.
+ *
+ * The name is stored as user metadata at sign-up. Accounts created before that
+ * field existed have none, so the email local part is the fallback: imperfect,
+ * but better than showing a full email address in a greeting.
+ */
+export function getFirstName(user) {
+  if (!user) return '';
+  const full = user.user_metadata?.full_name?.trim();
+  if (full) return full.split(/\s+/)[0];
+  const local = (user.email ?? '').split('@')[0].split(/[._-]/)[0];
+  return local ? local.charAt(0).toUpperCase() + local.slice(1) : '';
+}
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -52,11 +67,22 @@ export function AuthProvider({ children }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const signUpWithEmail = useCallback(async (email, password) => {
+  /**
+   * fullName is written into user metadata, which rides along inside the JWT
+   * and comes back on every session. That means greeting someone by name costs
+   * no extra request, and the backend can read it from the token if it ever
+   * needs to. It is user-supplied and not verified, so it is fine for display
+   * and nothing else.
+   */
+  const signUpWithEmail = useCallback(async (email, password, fullName = '') => {
+    const name = fullName.trim();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: name ? { full_name: name } : {},
+      },
     });
     if (error) throw error;
     // With email confirmation on, no session comes back until they click the
@@ -67,6 +93,21 @@ export function AuthProvider({ children }) {
   const signInWithEmail = useCallback(async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+  }, []);
+
+  /**
+   * Lets an existing account set or correct its name. Accounts created before
+   * the name field existed have no metadata, so without this they are stuck
+   * with the email fallback forever.
+   */
+  const updateFullName = useCallback(async (fullName) => {
+    const name = (fullName ?? '').trim();
+    if (!name) throw new Error('Enter a name first.');
+    const { data, error } = await supabase.auth.updateUser({ data: { full_name: name } });
+    if (error) throw error;
+    // updateUser does not fire onAuthStateChange in every version, so the
+    // session is refreshed by hand to make the new name show immediately.
+    setSession((s) => (s ? { ...s, user: data.user } : s));
   }, []);
 
   const sendPasswordReset = useCallback(async (email) => {
@@ -88,17 +129,21 @@ export function AuthProvider({ children }) {
     return data.session?.access_token ?? null;
   }, []);
 
+  const user = session?.user ?? null;
+
   const value = useMemo(() => ({
     session,
-    user: session?.user ?? null,
+    user,
+    firstName: getFirstName(user),
     loading,
     authConfigured,
     signUpWithEmail,
     signInWithEmail,
+    updateFullName,
     sendPasswordReset,
     signOut,
     getAccessToken,
-  }), [session, loading, signUpWithEmail, signInWithEmail,
+  }), [session, user, loading, signUpWithEmail, signInWithEmail, updateFullName,
        sendPasswordReset, signOut, getAccessToken]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

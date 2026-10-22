@@ -18,3 +18,5 @@ backend/app/.embed_cache.json
 backend/app/fitness_dataset.csv
 
 backend/app/__pycache__/
+__pycache__/
+*.pyc

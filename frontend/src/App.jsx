@@ -77,6 +77,18 @@ const STEPS = [
   { n: '03', title: 'Train the week', body: 'Seven days of sessions matched to your goal, with meals sized to the target.' },
 ];
 
+// Keyed on the goal the plan actually applied, not the one the form asked for.
+// The underweight safety guard can override the request, and the explanation
+// has to match the numbers on screen or it misleads.
+const GOAL_NOTE = {
+  fat_loss:
+    'Your calories sit a little below what your body burns, so weight comes off slowly. Aim for about half a kilo (1 lb) a week at most. Faster is not better, and it usually costs you muscle.',
+  muscle_gain:
+    'Your calories sit a little above what your body burns, so your muscles have fuel to grow. Skipping meals works against you here: eating enough matters as much as training.',
+  maintenance:
+    'Your calories match what your body burns, so your weight should stay roughly steady. Consistency is the whole goal here.',
+};
+
 const LBS_PER_KG = 2.20462;
 const CM_PER_IN = 2.54;
 
@@ -85,6 +97,16 @@ const CM_PER_IN = 2.54;
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' &&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * First name from the name given at sign-up. Returns an empty string when no
+ * name is on file, rather than guessing from the email address: a greeting
+ * built from "kshitij23@..." is worse than simply asking.
+ */
+function getFirstName(user) {
+  const full = user?.user_metadata?.full_name?.trim();
+  return full ? full.split(/\s+/)[0] : '';
+}
 
 /** Counts up to a value once. The single piece of motion on a real plan. */
 function useCountUp(target, duration = 900) {
@@ -247,10 +269,6 @@ function ProjectionChart({ startKg, tdee, target, units }) {
 }
 
 /**
- * Tick off sessions as you do them. Kept in this browser only, per plan, so it
- * works without accounts; clearing site data clears it.
- */
-/**
  * Session ticks. Written to the server when the plan belongs to an account, so
  * progress follows the person between devices; localStorage is the fallback
  * for anonymous plans, where there is nowhere else to put it.
@@ -323,7 +341,7 @@ function WeekTracker({ days, done, onReset }) {
 }
 
 /** Signed-in state in the header: who you are, and the way out. */
-function AccountMenu({ user, onSignIn, onSignOut, loading }) {
+function AccountMenu({ user, firstName, onSignIn, onSignOut, loading }) {
   const [open, setOpen] = useState(false);
   if (loading) return <span className="w-20 h-6" aria-hidden="true" />;
 
@@ -336,7 +354,7 @@ function AccountMenu({ user, onSignIn, onSignOut, loading }) {
     );
   }
 
-  const initial = (user.email ?? '?').charAt(0).toUpperCase();
+  const initial = (firstName || user.email || '?').charAt(0).toUpperCase();
   return (
     <div className="relative">
       <button onClick={() => setOpen((o) => !o)} aria-expanded={open}
@@ -344,7 +362,9 @@ function AccountMenu({ user, onSignIn, onSignOut, loading }) {
         <span className="w-6 h-6 rounded-full bg-[#FF5A1F] text-white flex items-center justify-center text-[11px] font-extrabold">
           {initial}
         </span>
-        <span className="hidden sm:inline max-w-[160px] truncate">{user.email}</span>
+        {/* The first name, not the email: shorter, friendlier, and it fits on
+            a phone, so it no longer has to be hidden below the sm breakpoint. */}
+        <span className="max-w-[160px] truncate">{firstName || 'Account'}</span>
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-[#E3E1DA] shadow-lg p-1.5 z-20">
@@ -355,6 +375,51 @@ function AccountMenu({ user, onSignIn, onSignOut, loading }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Accounts created before the name field existed have no name on file. Rather
+ * than guess from the email address, ask once. It disappears as soon as a name
+ * is saved, because the greeting then has something real to show.
+ */
+function NameBanner({ onSave }) {
+  const [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!value.trim()) { setError('Please enter your name.'); return; }
+    setBusy(true); setError('');
+    try {
+      await onSave(value);
+    } catch (err) {
+      setError(err.message || 'Could not save your name. Try again.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="no-print bg-[#FDF5EE] border-b border-[#E8D5C2]">
+      <form onSubmit={save}
+        className="max-w-[1060px] mx-auto px-5 md:px-8 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label htmlFor="bannerName" className="text-[13px] font-bold text-[#6B4A32]">
+          Welcome. What should we call you?
+        </label>
+        <input id="bannerName" type="text" required maxLength={60} autoComplete="name"
+          value={value} onChange={(e) => setValue(e.target.value)}
+          placeholder="Your name"
+          className="bg-white border border-[#E8D5C2] rounded-lg px-3 py-1.5 text-[14px]
+                     outline-none focus:border-[#10231F]" />
+        <button type="submit" disabled={busy}
+          className="bg-[#10231F] hover:bg-[#17352D] disabled:bg-[#A9B5AE] text-[#F6F5F2]
+                     text-[12px] font-bold px-4 py-2 rounded-lg transition-colors">
+          {busy ? 'Saving' : 'Save'}
+        </button>
+        {error && <span role="alert" className="text-[12px] text-[#A8521C]">{error}</span>}
+      </form>
     </div>
   );
 }
@@ -428,6 +493,133 @@ function MacroBar({ macros, calories }) {
   );
 }
 
+/**
+ * Numbers alone do not tell someone new to this what to actually do on Monday
+ * morning. Each step uses the person's own targets rather than generic advice,
+ * and hand measures are used instead of a kitchen scale on purpose: a rule you
+ * can follow in a canteen beats a precise one you abandon in a week.
+ */
+function DietGuide({ calories, proteinG, goal, vegetarian }) {
+  const proteinFoods = vegetarian
+    ? 'paneer, tofu, eggs, dal or Greek yoghurt'
+    : 'chicken, fish, eggs, dal or tofu';
+
+  const steps = [
+    ['Treat the calories as a daily budget.',
+      `Aim for about ${calories} kcal across the whole day. Within 100 either side is fine. You do not need to hit it exactly, and one day does not decide anything.`],
+    ['Build every meal around protein first.',
+      `Your daily target is about ${Math.round(proteinG)} g. A palm-sized portion of ${proteinFoods} is roughly 20 to 30 g, so three or four portions a day gets you most of the way there.`],
+    ['Measure with your hand, not a scale.',
+      'A palm is one protein portion. A closed fist is one portion of rice, pasta or potato. A cupped hand is one portion of fruit. A thumb is one portion of oil, butter or nuts.'],
+    ['Swap foods freely.',
+      'Replace anything with something similar and keep the portion size the same: rice for roti, chicken for fish, apple for banana. The plan is a shape, not a shopping list.'],
+    ['Drink water through the day.',
+      'Roughly 2 to 3 litres. A glass before each meal helps, and thirst is often mistaken for hunger.'],
+    ['Cook ahead where you can.',
+      'Making two or three meals in bulk at the weekend is what keeps a busy Wednesday from becoming a takeaway.'],
+    ['Missed a meal or ate off plan?',
+      'Carry on with the next meal as normal. Do not skip food later to make up for it. Consistency across a week beats being perfect for two days.'],
+  ];
+
+  return (
+    <div className="mt-8 pt-7 border-t border-[#EDEBE5]">
+      <h3 className="text-[13px] font-extrabold mb-1.5">How to follow this</h3>
+      <p className="text-[13px] text-[#6E756F] leading-relaxed mb-6">
+        {GOAL_NOTE[goal] ?? GOAL_NOTE.maintenance}
+      </p>
+
+      <ol className="space-y-4">
+        {steps.map(([title, body], i) => (
+          <li key={title} className="grid grid-cols-[28px_1fr] gap-3">
+            <span className="figure text-[13px] text-[#FF5A1F] pt-0.5">
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <p className="text-[13.5px] text-[#454B47] leading-relaxed">
+              <b className="text-[#141815]">{title}</b> {body}
+            </p>
+          </li>
+        ))}
+      </ol>
+
+      <details className="mt-6 text-[13px] text-[#6E756F] leading-relaxed">
+        <summary className="cursor-pointer font-bold text-[#141815]">
+          What do protein, carbs and fat actually mean?
+        </summary>
+        <p className="mt-2.5">
+          <b>Protein</b> repairs and builds muscle: meat, fish, eggs, dairy, lentils, tofu.{' '}
+          <b>Carbs</b> are your main source of energy: rice, bread, fruit, potatoes, oats.{' '}
+          <b>Fat</b> supports your hormones and keeps you full: nuts, oil, cheese, avocado.{' '}
+          <b>kcal</b> is a unit of energy, the same thing most people just call calories.
+        </p>
+      </details>
+    </div>
+  );
+}
+
+/**
+ * The training equivalent. Deliberately explains the vocabulary the plan uses
+ * ("3 x 10", "push day"), because a template written in gym shorthand is not
+ * actually usable by the person who most needs the structure.
+ */
+function TrainingGuide() {
+  const steps = [
+    ['Warm up for five minutes first.',
+      'Brisk walking, arm circles and a few bodyweight squats before every session. It is the cheapest injury prevention there is.'],
+    ['Read the sets and reps like this.',
+      '"3 x 10" means do the movement 10 times, rest, and repeat that three times in total.'],
+    ['Pick a weight that feels challenging.',
+      'The last two reps of a set should feel hard while your form stays clean. If you could do five more, go heavier next time.'],
+    ['Rest 60 to 90 seconds between sets.',
+      'Use your phone timer rather than guessing. Rushing the rest makes the next set worse, not better.'],
+    ['Rest days are part of the plan.',
+      'You get stronger while you recover, not while you train. Skipping rest days slows you down.'],
+    ['Tick each session off as you finish it.',
+      'The ring above fills as you go. Watching a week complete itself is the most reliable motivation there is.'],
+    ['Stop if something hurts.',
+      'A burning muscle is normal. Sharp pain, or pain in a joint, is not. Stop that movement and come back to it another day.'],
+  ];
+
+  return (
+    <div className="no-print px-6 md:px-9 pb-8 pt-6 border-t border-white/10">
+      <h3 className="text-[13px] font-extrabold mb-5">How to follow this</h3>
+
+      <ol className="space-y-4">
+        {steps.map(([title, body], i) => (
+          <li key={title} className="grid grid-cols-[28px_1fr] gap-3">
+            <span className="figure text-[13px] text-[#FF5A1F] pt-0.5">
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <p className="text-[13.5px] leading-relaxed">
+              <b className="text-[#F6F5F2]">{title}</b>{' '}
+              <span className="text-[#A9B5AE]">{body}</span>
+            </p>
+          </li>
+        ))}
+      </ol>
+
+      <details className="mt-6 text-[13px] text-[#A9B5AE] leading-relaxed">
+        <summary className="cursor-pointer font-bold text-[#F6F5F2]">
+          Words in the plan you might not know
+        </summary>
+        <p className="mt-2.5">
+          <b className="text-[#DDE3DF]">Rep</b>: one full movement, like a single push-up.{' '}
+          <b className="text-[#DDE3DF]">Set</b>: a group of reps done back to back.{' '}
+          <b className="text-[#DDE3DF]">Push day</b>: chest, shoulders and triceps.{' '}
+          <b className="text-[#DDE3DF]">Pull day</b>: back and biceps.{' '}
+          <b className="text-[#DDE3DF]">Intervals</b>: short hard efforts with easy recovery between them.{' '}
+          <b className="text-[#DDE3DF]">Mobility</b>: gentle stretching and joint movement.{' '}
+          <b className="text-[#DDE3DF]">Form</b>: doing a movement correctly and safely.
+        </p>
+      </details>
+
+      <p className="text-[12px] text-[#7E8C85] mt-5 leading-relaxed">
+        New to exercise, coming back from an injury, or managing a health condition?
+        Check with a doctor before you start.
+      </p>
+    </div>
+  );
+}
+
 function QuoteBand({ quote }) {
   return (
     <section className="no-print py-16 md:py-20">
@@ -466,8 +658,10 @@ export default function App() {
   const slowTimer = useRef();
 
   const [showAuth, setShowAuth] = useState(false);
-  const { user, loading: authLoading, signOut, authConfigured } = useAuth();
+  const { user, loading: authLoading, signOut, authConfigured, updateFullName } = useAuth();
   const apiFetch = useApiFetch();
+
+  const firstName = getFirstName(user);
 
   const quote = useMemo(() => QUOTES[Math.floor(Math.random() * QUOTES.length)], []);
   const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -621,6 +815,8 @@ export default function App() {
         {loading ? 'Calculating your plan' : showPlan ? 'Your plan is ready' : ''}
       </p>
 
+      {user && !authLoading && !firstName && <NameBanner onSave={updateFullName} />}
+
       {/* ------------------------------------------------------------ hero */}
       <div className={`pine-grid pine-grid-drift text-[#F6F5F2] relative overflow-hidden
                        ${showPlan ? 'pb-20' : 'pb-36'} print-plain`}>
@@ -650,7 +846,7 @@ export default function App() {
                 </>
               )}
               {authConfigured && (
-                <AccountMenu user={user} loading={authLoading}
+                <AccountMenu user={user} firstName={firstName} loading={authLoading}
                   onSignIn={() => setShowAuth(true)} onSignOut={signOut} />
               )}
             </div>
@@ -659,15 +855,19 @@ export default function App() {
           {!showPlan ? (
             <div className="pt-16 md:pt-20 grid md:grid-cols-[minmax(0,1fr)_auto] gap-12 md:gap-10 items-center">
               <div className="max-w-[560px]">
-                <p className="text-[11px] font-bold text-[#FF5A1F] mb-5">
-                  Nutrition and training targets
+                {/* The eyebrow does double duty: it greets you once you have an
+                    account, and labels the product before you do. */}
+                <p className={`font-bold text-[#FF5A1F] mb-5 ${
+                  firstName ? 'text-[16px]' : 'text-[11px]'}`}>
+                  {firstName ? `Welcome, ${firstName}` : 'Nutrition and training targets'}
                 </p>
                 <h1 className="text-[40px] md:text-[56px] font-extrabold leading-[1] tracking-[-0.035em] balance">
                   Know exactly what to eat and how to train this week.
                 </h1>
                 <p className="text-[15px] md:text-[16px] text-[#A9B5AE] mt-7 leading-relaxed max-w-[480px]">
                   Your calorie target, macro split, and a seven-day training week, calculated
-                  from your own measurements with the Mifflin-St Jeor equation. No sign-up.
+                  from your own measurements with the Mifflin-St Jeor equation. Every plan comes
+                  with plain-language instructions for following it. No sign-up needed.
                 </p>
                 <div className="flex flex-wrap items-center gap-4 mt-9">
                   <a href="#measurements"
@@ -692,7 +892,9 @@ export default function App() {
             // With a plan loaded the hero becomes its header band, so the result
             // reads as a document that was issued rather than a page rendered.
             <div className="pt-14 pb-2">
-              <p className="text-[11px] font-bold text-[#FF5A1F] mb-4">Your plan</p>
+              <p className="text-[11px] font-bold text-[#FF5A1F] mb-4">
+                {firstName ? `${firstName}'s plan` : 'Your plan'}
+              </p>
               <h1 className="figure text-[38px] md:text-[48px] leading-none">{goalLabel}</h1>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 text-[12px] text-[#A9B5AE] tnum">
                 <span>{form.age} yrs</span>
@@ -934,6 +1136,13 @@ export default function App() {
                 Calories split by a typical distribution across the day. Move them around to suit
                 your schedule; the daily total is what counts.
               </p>
+
+              <DietGuide
+                calories={calories}
+                proteinG={plan.nutrition.macros.protein_g}
+                goal={plan.applied_goal}
+                vegetarian={form.diet_type === 'vegetarian'}
+              />
             </section>
 
             <section className="rise rise-2 mt-6 print-break">
@@ -982,6 +1191,8 @@ export default function App() {
                     );
                   })}
                 </div>
+
+                <TrainingGuide />
               </div>
             </section>
 

@@ -37,6 +37,17 @@ def _get_profile(profile_id: int, db: Session) -> models.UserProfile:
     return profile
 
 
+def _assert_may_read(profile: models.UserProfile, user: auth.AuthUser | None) -> None:
+    """A plan owned by an account is readable only by that account. A plan with
+    no owner stays readable by anyone holding its link, which is what makes
+    anonymous use work.
+
+    This answers 404 rather than 403 on purpose: a 403 would confirm to a
+    stranger that a plan exists at that id."""
+    if profile.user_id and (user is None or user.id != profile.user_id):
+        raise HTTPException(status_code=404, detail=f"No profile {profile.id}")
+
+
 def _assert_may_write(profile: models.UserProfile, user: auth.AuthUser | None) -> None:
     """A plan owned by an account may only be changed by that account. A plan
     with no owner stays editable by anyone holding its link, which is what
@@ -56,6 +67,9 @@ def health():
         details={
             "coach_provider": coach.PROVIDER,
             "auth_enabled": str(auth.auth_enabled).lower(),
+            # "postgresql" on Render once DATABASE_URL is set, "sqlite" if the
+            # variable is missing and plans are still being lost on deploy.
+            "database": database.engine.dialect.name,
         },
     )
 
@@ -77,8 +91,12 @@ def create_plan(profile: schemas.ProfileCreate,
 
 
 @app.get("/api/profile/{profile_id}", response_model=schemas.ProfileResponse)
-def get_profile(profile_id: int, db: Session = Depends(database.get_db)):
-    return _get_profile(profile_id, db)
+def get_profile(profile_id: int,
+                db: Session = Depends(database.get_db),
+                user: auth.AuthUser | None = auth.OptionalUser):
+    profile = _get_profile(profile_id, db)
+    _assert_may_read(profile, user)
+    return profile
 
 
 @app.get("/api/my-plans", response_model=list[schemas.ProfileSummary])
@@ -142,9 +160,13 @@ def claim_profile(profile_id: int,
 
 @app.post("/api/chat", response_model=schemas.ChatResponse)
 def chat_with_coach(request: schemas.ChatRequest,
-                    db: Session = Depends(database.get_db)):
+                    db: Session = Depends(database.get_db),
+                    user: auth.AuthUser | None = auth.OptionalUser):
     """Answers about one user's own plan. The profile id is required: without
-    it the coach has no idea who it is talking to."""
+    it the coach has no idea who it is talking to. The same read rule applies
+    as for fetching the plan, so the coach cannot be used to read someone
+    else's."""
     profile = _get_profile(request.profile_id, db)
+    _assert_may_read(profile, user)
     answer = coach.get_coach_response(request.query, profile, profile.generated_plan)
     return schemas.ChatResponse(response=answer, grounded_in_profile_id=profile.id)
