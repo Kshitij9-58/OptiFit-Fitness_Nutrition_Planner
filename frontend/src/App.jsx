@@ -1674,8 +1674,8 @@ export default function App() {
             Built by a sprinter who thinks fitness is the one currency you cannot borrow.
           </p>
           <p className="text-[11px] text-[#9DA29E] leading-relaxed max-w-[680px] mt-3">
-            Not medical advice. Talk to a doctor or a registered dietitian before any
-            significant change.
+            Nothing drastic. If a change feels like too much, talk to a doctor or a
+            registered dietitian.
             {profileId && <span className="no-print"> Your plan stays at this link.</span>}
           </p>
         </footer>
