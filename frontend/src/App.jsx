@@ -42,14 +42,6 @@ const MACROS = [
   { key: 'fats_g', label: 'Fat', kcalPerG: 9, color: '#C9BFA8' },
 ];
 
-// Short, attributed, and old enough to be freely quotable.
-const QUOTES = [
-  { text: 'Let food be thy medicine and medicine be thy food.', who: 'Hippocrates' },
-  { text: 'No man has the right to be an amateur in physical training.', who: 'Socrates' },
-  { text: 'The groundwork of all happiness is health.', who: 'Leigh Hunt' },
-  { text: 'A sound mind in a sound body is a thing to be prayed for.', who: 'Juvenal' },
-];
-
 // Showing the working is what separates a calculator you trust from one you
 // do not. Each answer names the actual method rather than gesturing at it.
 const METHOD = [
@@ -88,6 +80,11 @@ const GOAL_NOTE = {
   maintenance:
     'Your calories match what your body burns, so your weight should stay roughly steady. Consistency is the whole goal here.',
 };
+
+// Rest days are detected from the session text rather than a flag, because
+// the plan templates are plain strings. If a rest day ever renders as a
+// training day, widen this pattern to match the wording the template used.
+const REST_PATTERN = /\b(rest|recovery|off|active recovery)\b/i;
 
 const LBS_PER_KG = 2.20462;
 const CM_PER_IN = 2.54;
@@ -144,20 +141,10 @@ function Mark({ className = '' }) {
   );
 }
 
-/** Heart trace drawing itself across the hero, behind the content. */
-function PulseLine({ className = '' }) {
-  return (
-    <svg className={`ecg ${className}`} viewBox="0 0 1200 160" fill="none"
-      preserveAspectRatio="none" aria-hidden="true">
-      <path
-        d="M0 80 H180 l18 -44 l16 88 l18 -66 l14 22 H420 l20 -52 l16 104 l18 -78 l14 26 H760
-           l18 -44 l16 88 l18 -66 l14 22 H1200"
-        stroke="#FF5A1F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** A sample readout in the hero, so the first screen shows the output. */
+/**
+ * A worked example in the hero, set the way a timing board sets a result:
+ * the figure first, the detail under it, every digit holding its column.
+ */
 function HeroSpecimen() {
   const kcal = useCountUp(2480, 1400);
   const bars = [
@@ -168,20 +155,20 @@ function HeroSpecimen() {
   return (
     <div className="float w-full max-w-[320px] bg-white rounded-2xl border border-black/5
                     shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] p-6" aria-hidden="true">
-      <p className="text-[10px] font-bold text-[#6E756F] mb-3">Sample plan</p>
+      <p className="text-[11px] text-[#6E756F] mb-3">A worked example</p>
       <div className="flex items-end gap-2">
-        <span className="figure text-[46px] leading-[0.8] text-[#141815]">{kcal}</span>
-        <span className="text-[12px] text-[#6E756F] pb-1.5 font-semibold">kcal / day</span>
+        <span className="scoreboard text-[48px] leading-[0.78] text-[#141815]">{kcal}</span>
+        <span className="text-[12px] text-[#6E756F] pb-1.5 font-semibold">kcal a day</span>
       </div>
 
       <div className="mt-6 space-y-3">
         {bars.map((b, i) => (
           <div key={b.label}>
-            <div className="flex justify-between text-[11px] mb-1.5">
+            <div className="flex justify-between items-baseline text-[11px] mb-1.5">
               <span className="font-bold text-[#6E756F]">{b.label}</span>
-              <span className="tnum text-[#9DA29E]">{b.g}g</span>
+              <span className="scoreboard text-[13px] text-[#141815]">{b.g}g</span>
             </div>
-            <div className="h-1.5 rounded-full bg-[#EDEBE5] overflow-hidden">
+            <div className="relative h-1.5 rounded-full bg-[#EDEBE5] overflow-hidden">
               <div className="h-full rounded-full grow-bar"
                 style={{ width: `${b.pct * 2}%`, background: b.color,
                          animationDelay: `${300 + i * 130}ms` }} />
@@ -191,10 +178,10 @@ function HeroSpecimen() {
       </div>
 
       <div className="mt-6 pt-4 border-t border-[#EDEBE5] space-y-2">
-        {[['Mon', 'Heavy push'], ['Tue', 'Intervals'], ['Wed', 'Mobility']].map(([d, s]) => (
+        {[['Mon', 'Heavy push'], ['Tue', 'Intervals'], ['Wed', 'Mobility']].map(([d, w]) => (
           <div key={d} className="flex gap-3 text-[11px]">
             <span className="font-extrabold text-[#FF5A1F] w-8">{d}</span>
-            <span className="text-[#6E756F]">{s}</span>
+            <span className="text-[#6E756F]">{w}</span>
           </div>
         ))}
       </div>
@@ -228,12 +215,15 @@ function ProjectionChart({ startKg, tdee, target, units }) {
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-3 mb-5">
         <h2 className="text-[15px] font-extrabold">If you hold this for 12 weeks</h2>
-        <p className="text-[12px] text-[#6E756F] tnum">
-          {toDisplay(startKg).toFixed(1)} {unitLabel}
-          <span className="mx-2 text-[#C9BFA8]">&rarr;</span>
-          <span className="font-bold text-[#141815]">
-            {toDisplay(endKg).toFixed(1)} {unitLabel}
+        <p className="text-[12px] text-[#6E756F]">
+          <span className="scoreboard text-[17px] text-[#141815]">
+            {toDisplay(startKg).toFixed(1)}
           </span>
+          <span className="mx-2">to</span>
+          <span className="scoreboard text-[17px] text-[#141815]">
+            {toDisplay(endKg).toFixed(1)}
+          </span>
+          <span className="ml-1">{unitLabel}</span>
         </p>
       </div>
 
@@ -245,9 +235,9 @@ function ProjectionChart({ startKg, tdee, target, units }) {
             <stop offset="100%" stopColor="#FF5A1F" stopOpacity="0" />
           </linearGradient>
         </defs>
-        {[0, 4, 8, 12].map((w) => (
+        {Array.from({ length: 13 }, (_, w) => (
           <line key={w} x1={x(w)} y1={PAD} x2={x(w)} y2={H - PAD}
-            stroke="#E3E1DA" strokeWidth="1" />
+            stroke="#E3E1DA" strokeWidth="1" strokeOpacity={w % 4 === 0 ? 1 : 0.45} />
         ))}
         {changed && <path d={area} fill="url(#proj)" />}
         <path d={path} className="draw-line" fill="none" stroke="#FF5A1F"
@@ -256,7 +246,7 @@ function ProjectionChart({ startKg, tdee, target, units }) {
       </svg>
 
       <div className="flex justify-between text-[11px] text-[#9DA29E] font-semibold mt-1">
-        {[0, 4, 8, 12].map((w) => <span key={w}>{w ? `Week ${w}` : 'Now'}</span>)}
+        {[0, 4, 8, 12].map((w) => <span key={w}>{w ? `Week ${w}` : 'Today'}</span>)}
       </div>
 
       <p className="text-[11px] text-[#6E756F] leading-relaxed mt-4">
@@ -312,9 +302,12 @@ function useWeekProgress(profileId, serverDays, signedIn, apiFetch) {
   };
 }
 
-function WeekTracker({ days, done, onReset }) {
-  const count = days.filter((d) => done[d]).length;
-  const pct = days.length ? count / days.length : 0;
+function WeekTracker({ days, matrix, done, onReset }) {
+  // Rest days are not work to be ticked off, so counting them in the total
+  // meant a perfectly executed week could never reach full.
+  const sessions = days.filter((d) => !REST_PATTERN.test(matrix[d] ?? ''));
+  const count = sessions.filter((d) => done[d]).length;
+  const pct = sessions.length ? count / sessions.length : 0;
   const R = 15, C = 2 * Math.PI * R;
 
   return (
@@ -327,9 +320,14 @@ function WeekTracker({ days, done, onReset }) {
           style={{ transition: 'stroke-dashoffset 420ms cubic-bezier(0.22,1,0.36,1)' }} />
       </svg>
       <div>
-        <p className="text-[13px] font-extrabold tnum">{count} of {days.length} done</p>
+        <p className="text-[13px] font-extrabold">
+          <span className="scoreboard text-[15px]">{count}</span>
+          <span className="text-[#A9B5AE] font-semibold"> of {sessions.length} sessions done</span>
+        </p>
         <p className="text-[11px] text-[#A9B5AE]">
-          {count === days.length ? 'Full week. Well done.' : 'Tick each session as you finish it.'}
+          {count === sessions.length && sessions.length > 0
+            ? 'Every session done this week.'
+            : 'Tick each session as you finish it.'}
         </p>
       </div>
       <button onClick={onReset}
@@ -440,6 +438,10 @@ const inputClass =
   'w-full bg-white border border-[#D9D6CD] rounded-lg px-3.5 py-3 text-[15px] tnum ' +
   'outline-none transition-colors hover:border-[#B9B5AA] focus:border-[#10231F]';
 
+// Numbers you type read back in the same face the results use, so the figure
+// you enter and the figure you get are visibly the same kind of thing.
+const numberInputClass = inputClass + ' scoreboard text-[17px]';
+
 function Segmented({ options, value, onChange, label }) {
   return (
     <div role="group" aria-label={label} className="inline-flex p-0.5 bg-[#EDEBE5] rounded-lg">
@@ -456,7 +458,117 @@ function Segmented({ options, value, onChange, label }) {
   );
 }
 
-function MacroBar({ macros, calories }) {
+/* ========================================================== track devices
+
+A sprinter reads the world along a marked line: 10m intervals, a split at
+each marker, and the velocity curve that rises hard, holds, and decays to the
+tape. Energy, macros and the twelve weeks all use that same device, so the
+whole readout is measured against one consistent axis rather than scattered
+into unrelated cards.
+*/
+
+/**
+ * A real 100m velocity profile: steep acceleration through 30m, maximum
+ * velocity held around 50 to 60m, slight decay to the line. Used instead of
+ * a heartbeat trace, which every fitness product reaches for.
+ */
+function VelocityCurve({ className = '' }) {
+  return (
+    <svg className={className} viewBox="0 0 1200 170" fill="none"
+      preserveAspectRatio="none" aria-hidden="true">
+      {/* ten-metre markers */}
+      {Array.from({ length: 11 }, (_, i) => (
+        <line key={i} x1={i * 120} y1="0" x2={i * 120} y2="170"
+          stroke="#F6F5F2" strokeOpacity={i % 3 === 0 ? 0.13 : 0.06} strokeWidth="1" />
+      ))}
+      <path className="velocity-draw"
+        d="M0 158 C 60 142, 140 94, 240 64 C 330 38, 420 27, 540 25
+           C 700 23, 880 33, 1200 53"
+        stroke="#FF5A1F" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Horizontal scale with the three energy figures placed on one axis. Reading
+ * resting burn, daily burn and target as positions on a shared line makes the
+ * size of the gap legible at a glance, which three separate numbers in a
+ * table never manage.
+ */
+function EnergyScale({ bmr, tdee, target }) {
+  // The single piece of non-interactive motion in the whole readout: the
+  // headline figure counting up once on arrival, like a timing board
+  // settling. Everything else stays still.
+  const shown = useCountUp(target ?? 0);
+  const max = Math.max(tdee, target) * 1.08;
+  const at = (v) => Math.max(0, Math.min(100, (v / max) * 100));
+  const deficit = target < tdee;
+  const gap = Math.abs(target - tdee);
+
+  // Ticks every 500 kcal, the way distance markers sit every ten metres.
+  const ticks = [];
+  for (let v = 500; v < max; v += 500) ticks.push(v);
+
+  return (
+    <div>
+      <div className="flex items-end gap-3">
+        <span className="scoreboard text-[64px] md:text-[80px] leading-[0.78]">{shown}</span>
+        <span className="text-[14px] text-[#6E756F] pb-2 font-semibold">kcal a day</span>
+      </div>
+
+      <div className="relative h-[52px] mt-8" role="img"
+        aria-label={`Resting burn ${bmr}, daily burn ${tdee}, target ${target} kcal`}>
+        {/* the field */}
+        <div className="absolute inset-x-0 top-[18px] h-[14px] bg-[#EDEBE5] rounded-[3px]" />
+
+        {ticks.map((v) => (
+          <div key={v} className="absolute top-[18px] h-[14px] w-px bg-[#D9D6CD]"
+            style={{ left: `${at(v)}%` }} />
+        ))}
+
+        {/* resting burn, the part of the target you spend doing nothing */}
+        <div className="absolute top-[18px] h-[14px] bg-[#C9BFA8] rounded-l-[3px]"
+          style={{ width: `${at(bmr)}%` }} />
+
+        {/* the rest of the target */}
+        <div className="absolute top-[18px] h-[14px] bg-[#FF5A1F]"
+          style={{ left: `${at(bmr)}%`, width: `${Math.max(at(target) - at(bmr), 0)}%` }} />
+
+        {/* daily burn sits as a post, so the gap to target reads as distance */}
+        <div className="absolute top-[10px] h-[30px] w-[2px] bg-[#10231F]"
+          style={{ left: `${at(tdee)}%` }} />
+        <span className="absolute top-0 text-[10px] font-bold text-[#10231F] whitespace-nowrap"
+          style={{ left: `${at(tdee)}%`, transform: 'translateX(-50%)' }}>
+          burn
+        </span>
+      </div>
+
+      <dl className="grid grid-cols-3 gap-4 mt-3 text-[12px]">
+        <div>
+          <dt className="text-[#6E756F]">Resting burn</dt>
+          <dd className="scoreboard text-[20px] mt-1">{bmr}</dd>
+        </div>
+        <div>
+          <dt className="text-[#6E756F]">With your activity</dt>
+          <dd className="scoreboard text-[20px] mt-1">{tdee}</dd>
+        </div>
+        <div>
+          <dt className="text-[#6E756F]">{deficit ? 'Short of your burn' : 'Above your burn'}</dt>
+          <dd className="scoreboard text-[20px] mt-1 text-[#FF5A1F]">
+            {deficit ? '\u2212' : '+'}{gap}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+/**
+ * The three macros run the same track, measured against the day's calories,
+ * so their relative size is read by how far each one gets rather than by
+ * comparing three unrelated numbers.
+ */
+function MacroLanes({ macros, calories }) {
   const rows = MACROS.map((m) => {
     const grams = macros[m.key] ?? 0;
     const kcal = grams * m.kcalPerG;
@@ -465,29 +577,292 @@ function MacroBar({ macros, calories }) {
 
   return (
     <div>
-      <div className="flex h-3 rounded-full overflow-hidden bg-[#E7E4DC] gap-0.5" role="img"
-        aria-label={rows.map((r) => `${r.label} ${Math.round(r.pct)} percent`).join(', ')}>
-        {rows.map((r, i) => (
-          <div key={r.key} className="grow-bar first:rounded-l-full last:rounded-r-full"
-            style={{ width: `${r.pct}%`, background: r.color, animationDelay: `${i * 110}ms` }} />
-        ))}
-      </div>
-      <div className="grid grid-cols-3 gap-5 mt-5">
+      <h3 className="text-[15px] font-extrabold mb-6">What those calories are made of</h3>
+      <div className="space-y-5">
         {rows.map((r) => (
           <div key={r.key}>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ background: r.color }} />
-              <span className="text-[11px] font-bold text-[#6E756F]">{r.label}</span>
+            <div className="flex items-baseline justify-between mb-2">
+              <span className="text-[13px] font-bold">{r.label}</span>
+              <span className="text-[12px] text-[#6E756F]">
+                <span className="scoreboard text-[16px] text-[#141815]">{Math.round(r.grams)}</span>
+                <span className="ml-1">grams, {Math.round(r.pct)} percent of the day</span>
+              </span>
             </div>
-            <p className="figure text-[30px] leading-none">
-              {Math.round(r.grams)}
-              <span className="text-[14px] font-medium text-[#6E756F] ml-0.5">g</span>
-            </p>
-            <p className="text-[11px] text-[#6E756F] tnum mt-1.5">
-              {Math.round(r.kcal)} kcal · {Math.round(r.pct)}%
-            </p>
+            <div className="relative h-[10px] bg-[#EDEBE5] rounded-[3px] overflow-hidden">
+              {[25, 50, 75].map((t) => (
+                <div key={t} className="absolute inset-y-0 w-px bg-[#D9D6CD]" style={{ left: `${t}%` }} />
+              ))}
+              <div className="absolute inset-y-0 left-0 rounded-[3px] grow-bar"
+                style={{ width: `${r.pct}%`, background: r.color }} />
+            </div>
           </div>
         ))}
+      </div>
+      <p className="text-[11px] text-[#6E756F] mt-5 leading-relaxed">
+        Marks sit at a quarter, a half and three quarters of your daily calories.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The training week as a start list.
+ */
+function SessionBoard({ days, matrix, done, onToggle }) {
+  return (
+    <div className="px-6 md:px-9 pb-7">
+      {days.map((day, i) => {
+        const workout = matrix[day];
+        const isRest = REST_PATTERN.test(workout);
+        const isDone = Boolean(done[day]);
+        return (
+          <div key={day}
+            className={`grid grid-cols-[26px_40px_1fr] md:grid-cols-[26px_104px_1fr] gap-4 py-4 items-start ${
+              i < days.length - 1 ? 'border-b border-white/10' : ''}`}>
+
+            {isRest ? (
+              <span className="mt-0.5 w-[18px] h-[18px] rounded-[5px] border border-white/15"
+                aria-hidden="true" />
+            ) : (
+              <button onClick={() => onToggle(day)} aria-pressed={isDone}
+                aria-label={`Mark ${day} as done`}
+                className={`no-print mt-0.5 w-[18px] h-[18px] rounded-[5px] border flex items-center justify-center transition-colors ${
+                  isDone ? 'bg-[#FF5A1F] border-[#FF5A1F]'
+                         : 'border-white/30 hover:border-white/60'}`}>
+                {isDone && (
+                  <svg viewBox="0 0 12 12" className="w-3 h-3" aria-hidden="true">
+                    <path d="M2.5 6.2l2.3 2.3 4.7-5" fill="none" stroke="#10231F"
+                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
+            )}
+
+            <span className={`text-[11px] font-extrabold pt-0.5 transition-colors ${
+              isRest ? 'text-[#5E6E66]' : isDone ? 'text-[#5E6E66]' : 'text-[#FF5A1F]'}`}>
+              <span className="md:hidden">{day.slice(0, 3)}</span>
+              <span className="hidden md:inline">{day}</span>
+            </span>
+
+            <span className={`text-[14px] leading-relaxed transition-colors ${
+              isRest ? 'text-[#7E8C85] italic'
+                     : isDone ? 'text-[#5E6E66] line-through' : 'text-[#DDE3DF]'}`}>
+              {workout}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+/* ================================================== the runner and friends */
+
+/**
+ * A sprinter built as a sport pictogram: heavy round-capped strokes, one
+ * side set back in tone so the near and far limbs read apart, and a forward
+ * lean with the head ahead of the shoulders, which at this size does more to
+ * say "sprint" than any amount of anatomy would. Cadence comes in as a CSS
+ * variable so the same figure can walk, jog or fly.
+ */
+function Runner({ cadence = '0.46s', className = '' }) {
+  const side = (front) => {
+    const t = front ? 'lf' : 'lb';
+    const a = front ? 'A' : 'B';
+    return (
+      <>
+        <g className={`thigh${a}`}>
+          <line className={`${t} w-thigh`} x1="96" y1="112" x2="96" y2="152" />
+          <g className={`shin${a}`}>
+            <line className={`${t} w-shin`} x1="96" y1="152" x2="96" y2="188" />
+            <line className={`${t} w-shin`} x1="96" y1="188" x2="110" y2="190" />
+          </g>
+        </g>
+        <g className={`arm${a}`}>
+          <line className={`${t} w-arm`} x1="106" y1="64" x2="106" y2="94" />
+          <g className={`fore${a}`}>
+            <line className={`${t} w-fore`} x1="106" y1="94" x2="106" y2="120" />
+          </g>
+        </g>
+      </>
+    );
+  };
+  return (
+    <svg className={`runner ${className}`} viewBox="0 0 200 200"
+      style={{ '--cad': cadence, overflow: 'visible' }} aria-hidden="true">
+      <g className="rn-bob">
+        {side(false)}
+        <line className="lf w-torso" x1="106" y1="64" x2="96" y2="112" />
+        <circle cx="117" cy="46" r="13" fill="#FF5A1F" />
+        {side(true)}
+      </g>
+    </svg>
+  );
+}
+
+/* ------------------------------------------ what a thing costs to work off */
+
+const BURN_FOODS = [
+  { n: 'Slice of pizza', k: 285 }, { n: 'Chocolate bar', k: 230 },
+  { n: 'Banana', k: 105 },         { n: 'Cheeseburger', k: 550 },
+  { n: 'Latte', k: 190 },          { n: 'Samosa', k: 260 },
+  { n: 'Can of cola', k: 140 },    { n: 'Plate of biryani', k: 480 },
+  { n: 'Two rotis', k: 210 },      { n: 'Handful of almonds', k: 170 },
+];
+
+// Interval work carries no kph: the rest between reps is most of the session,
+// so an average speed across it would be meaningless.
+const BURN_ACTS = [
+  { n: 'Walking',         met: 3.5,  cad: '1.15s', kph: 5 },
+  { n: 'Climbing stairs', met: 8.8,  cad: '0.72s', kph: 0 },
+  { n: 'Cycling',         met: 7.5,  cad: '0.62s', kph: 18 },
+  { n: 'Jogging',         met: 8,    cad: '0.62s', kph: 8 },
+  { n: 'Running hard',    met: 11.5, cad: '0.44s', kph: 12 },
+  { n: 'Sprint repeats',  met: 15,   cad: '0.3s',  kph: 0 },
+];
+
+function Chip({ on, children, ...rest }) {
+  return (
+    <button type="button" aria-pressed={on} {...rest}
+      className={`text-[12.5px] font-semibold px-[15px] py-[10px] rounded-full border transition-colors ${
+        on ? 'bg-[#FF5A1F] border-[#FF5A1F] text-white'
+           : 'bg-white/[0.04] border-white/[0.14] text-[#8FA39B] hover:text-[#F6F5F2] hover:border-white/30'}`}>
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Minutes come from MET values: kcal per minute is MET x 3.5 x bodyweight in
+ * kg / 200. One MET is taken off first, because that is resting metabolism by
+ * definition and you would have burned it sitting still. Counting it as
+ * exercise is the usual error in these calculators and makes every session
+ * look cheaper than it was.
+ */
+function BurnPanel() {
+  const [foodI, setFoodI] = useState(0);
+  const [actI, setActI] = useState(3);
+  const [kg, setKg] = useState(70);
+
+  const food = BURN_FOODS[foodI];
+  const act = BURN_ACTS[actI];
+  const perMin = (act.met - 1) * 3.5 * kg / 200;
+  const mins = Math.max(1, Math.round(food.k / perMin));
+  const dist = act.kph ? (act.kph * mins) / 60 : 0;
+
+  return (
+    <div className="grid gap-8 lg:grid-cols-[1fr_0.92fr] lg:gap-12 items-start">
+      <div>
+        <p className="text-[12.5px] font-bold mb-3">Pick something you ate</p>
+        <div className="flex flex-wrap gap-2">
+          {BURN_FOODS.map((f, i) => (
+            <Chip key={f.n} on={i === foodI} onClick={() => setFoodI(i)}>
+              {f.n} <b className={i === foodI ? 'text-white' : 'text-[#F6F5F2]'}>{f.k}</b>
+            </Chip>
+          ))}
+        </div>
+
+        <p className="text-[12.5px] font-bold mt-7 mb-3">Pick how you would work it off</p>
+        <div className="flex flex-wrap gap-2">
+          {BURN_ACTS.map((a, i) => (
+            <Chip key={a.n} on={i === actI} onClick={() => setActI(i)}>{a.n}</Chip>
+          ))}
+        </div>
+
+        <div className="mt-7">
+          <div className="flex items-baseline justify-between mb-3">
+            <label htmlFor="burnKg" className="text-[12.5px] font-bold">Your weight</label>
+            <span className="scoreboard text-[19px] text-[#FF5A1F]">{kg} kg</span>
+          </div>
+          <input id="burnKg" type="range" min={45} max={130} step={1} value={kg}
+            onChange={(e) => setKg(+e.target.value)} className="range-track" />
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-b from-[#12302A] to-[#0B1E1A] border border-white/[0.09]
+                      rounded-[20px] p-7 text-center">
+        <div className="h-[128px] grid place-items-center mb-1.5">
+          <Runner cadence={act.cad} className="w-[104px] h-[122px]" />
+        </div>
+        <div className="flex items-end justify-center gap-2.5">
+          <span className="scoreboard text-[clamp(56px,9vw,78px)] leading-[0.8]">{mins}</span>
+          <span className="text-[13px] text-[#8FA39B] font-bold pb-2">minutes</span>
+        </div>
+        <p className="text-[14.5px] font-bold leading-snug mt-4 mx-auto max-w-[30ch]">
+          {act.n.toLowerCase()} to work off {food.n.toLowerCase()}
+        </p>
+        <p className="text-[12.5px] text-[#8FA39B] leading-relaxed mt-2.5 mx-auto max-w-[34ch]">
+          {dist ? `Roughly ${dist.toFixed(1)} km at ${kg} kg. ` : `Worked out for ${kg} kg. `}
+          None of this is a reason to skip the food.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------- the three kinds of work, moving */
+
+function DisciplineCards() {
+  const card = 'relative bg-gradient-to-b from-[#12302A] to-[#0C1F1B] border ' +
+    'border-white/[0.08] rounded-[18px] p-6 overflow-hidden transition-transform ' +
+    'duration-300 hover:-translate-y-1 hover:border-[#FF5A1F]/40';
+  const tag = 'absolute top-[18px] right-5 scoreboard text-[13px] text-[#FF5A1F]';
+
+  return (
+    <div className="grid gap-5 md:grid-cols-3">
+      <div className={card}>
+        <span className={tag}>6 x 150m</span>
+        <div className="h-[112px] grid place-items-center mb-4">
+          <Runner className="w-[96px] h-[110px]" />
+        </div>
+        <h4 className="text-[16px] font-extrabold mb-2">Run</h4>
+        <p className="text-[13px] text-[#8FA39B] leading-relaxed">
+          Short hard efforts with a full walk back. The session that costs the most
+          and takes the least time.
+        </p>
+      </div>
+
+      <div className={card}>
+        <span className={tag}>8 reps</span>
+        <div className="h-[112px] grid place-items-center mb-4">
+          <svg viewBox="0 0 128 96" className="w-32 h-24" aria-hidden="true">
+            <line x1="20" y1="30" x2="20" y2="86" stroke="#2A4B41" strokeWidth="7" strokeLinecap="round" />
+            <line x1="108" y1="30" x2="108" y2="86" stroke="#2A4B41" strokeWidth="7" strokeLinecap="round" />
+            <g className="rig-press">
+              <line x1="16" y1="40" x2="112" y2="40" stroke="#F6F5F2" strokeWidth="5" strokeLinecap="round" />
+              <rect x="24" y="22" width="9" height="36" rx="3" fill="#FF5A1F" />
+              <rect x="36" y="28" width="7" height="24" rx="3" fill="#C9BFA8" />
+              <rect x="95" y="22" width="9" height="36" rx="3" fill="#FF5A1F" />
+              <rect x="85" y="28" width="7" height="24" rx="3" fill="#C9BFA8" />
+            </g>
+          </svg>
+        </div>
+        <h4 className="text-[16px] font-extrabold mb-2">Lift</h4>
+        <p className="text-[13px] text-[#8FA39B] leading-relaxed">
+          Pick a weight where the last two reps feel hard and your form still holds.
+          Add a little each week.
+        </p>
+      </div>
+
+      <div className={card}>
+        <span className={tag}>2 days</span>
+        <div className="h-[112px] grid place-items-center mb-4">
+          <svg viewBox="0 0 96 96" className="breathe w-24 h-24" aria-hidden="true">
+            <circle className="b3" cx="48" cy="48" r="40" fill="none"
+              stroke="#2F6F5E" strokeWidth="3" />
+            <circle className="b2" cx="48" cy="48" r="40" fill="none"
+              stroke="#2F6F5E" strokeWidth="3" />
+            <circle className="b1" cx="48" cy="48" r="40" fill="none"
+              stroke="#FF5A1F" strokeWidth="3" />
+            <circle cx="48" cy="48" r="9" fill="#FF5A1F" />
+          </svg>
+        </div>
+        <h4 className="text-[16px] font-extrabold mb-2">Recover</h4>
+        <p className="text-[13px] text-[#8FA39B] leading-relaxed">
+          You get stronger while you rest, not while you train. Rest days are part of
+          the programme, not a gap in it.
+        </p>
       </div>
     </div>
   );
@@ -620,19 +995,26 @@ function TrainingGuide() {
   );
 }
 
-function QuoteBand({ quote }) {
+/**
+ * The last thing on the page should give someone a reason to come back
+ * tomorrow, not a list of what the product cannot do. The caveats already
+ * live in the footer and in the plan's own warnings, which is where they
+ * belong.
+ */
+function ClosingNote() {
   return (
     <section className="no-print py-16 md:py-20">
-      <div className="max-w-[720px]">
-        <span className="figure text-[52px] text-[#FF5A1F] leading-none block mb-2"
-          aria-hidden="true">&ldquo;</span>
-        <blockquote className="text-[24px] md:text-[30px] font-extrabold leading-[1.25]
-                               tracking-[-0.02em] balance">
-          {quote.text}
-        </blockquote>
-        <figcaption className="text-[12px] font-bold text-[#6E756F] mt-5">
-          {quote.who}
-        </figcaption>
+      <div className="max-w-[640px]">
+        <p className="text-[clamp(24px,3.4vw,34px)] font-extrabold leading-[1.18]
+                      tracking-[-0.03em] balance">
+          Nobody gets fitter in a week. They get fitter in the weeks they
+          kept showing up.
+        </p>
+        <p className="text-[14.5px] text-[#6E756F] leading-relaxed mt-6 max-w-[52ch]">
+          So the plan is built to be followed on a bad day, not just a good one.
+          Hand measures instead of a kitchen scale, swaps for anything you do not
+          have in, and rest days written in rather than left as gaps.
+        </p>
       </div>
     </section>
   );
@@ -663,7 +1045,6 @@ export default function App() {
 
   const firstName = getFirstName(user);
 
-  const quote = useMemo(() => QUOTES[Math.floor(Math.random() * QUOTES.length)], []);
   const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const readError = async (res) => {
@@ -721,7 +1102,7 @@ export default function App() {
   const goHome = () => { setEditing(true); setError(''); scrollTop(); };
 
   const startOver = () => {
-    setPlan(null); setProfileId(null); setIssuedAt(null);
+    setPlan(null); setProfileId(null); setIssuedAt(null); setServerDays(undefined);
     setEditing(true); setError('');
     setForm({
       age: '', height: '', weight: '', heightFt: '', heightIn: '',
@@ -731,6 +1112,22 @@ export default function App() {
     window.history.replaceState({}, '', window.location.pathname);
     scrollTop();
   };
+
+  // The plan lives in this component's state, and that state outlives a
+  // sign-out. Without this, the next person to sign in on the same browser
+  // saw the previous person's plan, body measurements included. Clear it when
+  // an account signs out or is replaced by a different one.
+  // Signed out to signed in is left alone on purpose: a plan someone built
+  // anonymously just before signing up is still theirs.
+  const userId = user?.id ?? null;
+  const previousUserId = useRef(null);
+  useEffect(() => {
+    if (authLoading) return;
+    if (previousUserId.current && previousUserId.current !== userId) startOver();
+    previousUserId.current = userId;
+    // startOver is recreated every render and only touches state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, authLoading]);
 
   const toMetric = () => {
     if (units === 'metric') {
@@ -776,7 +1173,6 @@ export default function App() {
   };
 
   const calories = plan?.nutrition?.daily_calories;
-  const animatedCalories = useCountUp(calories ?? 0);
   const progress = useWeekProgress(profileId, serverDays, Boolean(user), apiFetch);
   const trainingDays = useMemo(
     () => (plan ? Object.keys(plan.training_matrix) : []), [plan]);
@@ -822,8 +1218,14 @@ export default function App() {
                        ${showPlan ? 'pb-20' : 'pb-36'} print-plain`}>
         {/* Masked at both ends so the trace reads as a signal passing through
             rather than a stroke that stops dead against the form card. */}
-        <PulseLine className="no-print pointer-events-none absolute left-0 right-0 bottom-4
-                              h-[120px] w-full opacity-40 pulse-mask" />
+        <div className="no-print lane-sweep" aria-hidden="true" />
+        <div className="no-print glow glow-a" aria-hidden="true" />
+        <div className="no-print glow glow-b" aria-hidden="true" />
+        {!showPlan && (
+          <span className="no-print watermark scoreboard" aria-hidden="true">100</span>
+        )}
+        <VelocityCurve className="no-print velocity-mask pointer-events-none absolute left-0 right-0 bottom-0
+                                  h-[170px] w-full opacity-45" />
 
         <div className="max-w-[1060px] mx-auto px-5 md:px-8 relative">
           <div className="flex items-center gap-2.5 pt-7">
@@ -857,28 +1259,34 @@ export default function App() {
               <div className="max-w-[560px]">
                 {/* The eyebrow does double duty: it greets you once you have an
                     account, and labels the product before you do. */}
-                <p className={`font-bold text-[#FF5A1F] mb-5 ${
-                  firstName ? 'text-[16px]' : 'text-[11px]'}`}>
-                  {firstName ? `Welcome, ${firstName}` : 'Nutrition and training targets'}
+                <p className="flex items-center gap-2.5 text-[12px] font-bold text-[#FF5A1F] mb-5">
+                  <i className="kick-line" aria-hidden="true" />
+                  {firstName ? `Welcome back, ${firstName}` : 'Built by a sprinter'}
                 </p>
-                <h1 className="text-[40px] md:text-[56px] font-extrabold leading-[1] tracking-[-0.035em] balance">
-                  Know exactly what to eat and how to train this week.
+                <h1 className="text-[42px] md:text-[64px] font-extrabold leading-[0.96]
+                               tracking-[-0.042em] balance">
+                  <span className="ln"><span>Know what to eat.</span></span>
+                  <span className="ln ln-1"><span>Know how to train.</span></span>
+                  <span className="ln ln-2"><span className="text-[#FF5A1F]">Every week.</span></span>
                 </h1>
-                <p className="text-[15px] md:text-[16px] text-[#A9B5AE] mt-7 leading-relaxed max-w-[480px]">
+                <p className="fade-up fade-1 text-[15px] md:text-[16px] text-[#A9B5AE] mt-7 leading-relaxed max-w-[480px]">
                   Your calorie target, macro split, and a seven-day training week, calculated
                   from your own measurements with the Mifflin-St Jeor equation. Every plan comes
                   with plain-language instructions for following it. No sign-up needed.
                 </p>
-                <div className="flex flex-wrap items-center gap-4 mt-9">
+                <div className="fade-up fade-2 flex flex-wrap items-center gap-4 mt-9">
                   <a href="#measurements"
-                    className="bg-[#FF5A1F] hover:bg-[#E64A12] text-white text-[14px] font-bold px-7 py-3.5 rounded-lg transition-colors">
+                    className="go-ring bg-[#FF5A1F] hover:bg-[#E64A12] text-white text-[14px]
+                               font-bold px-8 py-4 rounded-xl transition-transform
+                               hover:-translate-y-0.5 shadow-[0_10px_30px_-10px_rgba(255,90,31,0.67)]">
                     Build my plan
                   </a>
                   <span className="text-[12px] text-[#7E8C85] font-semibold">
                     Takes about a minute. No sign-up.
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-x-7 gap-y-2 mt-8 text-[12px] text-[#7E8C85] font-semibold">
+                <div className="fade-up fade-3 flex flex-wrap gap-x-7 gap-y-2 mt-8
+                                text-[12px] text-[#7E8C85] font-semibold">
                   <span>Private link to your plan</span>
                   <span>Print and take it with you</span>
                   <span>Metric or imperial</span>
@@ -891,26 +1299,67 @@ export default function App() {
           ) : (
             // With a plan loaded the hero becomes its header band, so the result
             // reads as a document that was issued rather than a page rendered.
-            <div className="pt-14 pb-2">
-              <p className="text-[11px] font-bold text-[#FF5A1F] mb-4">
-                {firstName ? `${firstName}'s plan` : 'Your plan'}
-              </p>
-              <h1 className="figure text-[38px] md:text-[48px] leading-none">{goalLabel}</h1>
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 text-[12px] text-[#A9B5AE] tnum">
-                <span>{form.age} yrs</span>
-                <span>
-                  {units === 'metric'
-                    ? `${form.height} cm · ${form.weight} kg`
-                    : `${form.heightFt}ft ${form.heightIn || 0}in · ${form.weight} lb`}
-                </span>
-                <span>BMI {plan.metrics.bmi} · {plan.metrics.bmi_category}</span>
-                {profileId && <span>Ref {String(profileId).padStart(4, '0')}</span>}
-                {issuedAt && <span>{issuedAt.toLocaleDateString()}</span>}
-                <button onClick={() => setEditing(true)}
-                  className="no-print font-bold text-[#FF5A1F] hover:underline">
-                  Change details
-                </button>
+            // A start list carries a bib number and the competitor's details.
+            // The plan reference doubles as the bib, which is why it is set
+            // large rather than tucked into a row of metadata.
+            <div className="pt-14 pb-4">
+              <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
+                {profileId && (
+                  <div className="shrink-0">
+                    <span className="scoreboard text-[44px] md:text-[56px] leading-[0.8] text-[#FF5A1F]">
+                      {String(profileId).padStart(3, '0')}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <h1 className="figure text-[34px] md:text-[44px] leading-none">
+                    {firstName ? `${firstName}, you are training to ${goalLabel.toLowerCase()}` : goalLabel}
+                  </h1>
+                </div>
               </div>
+
+              <dl className="flex flex-wrap gap-x-9 gap-y-3 mt-7 text-[12px]">
+                <div>
+                  <dt className="text-[#7E8C85]">Age</dt>
+                  <dd className="scoreboard text-[17px] text-[#F6F5F2] mt-0.5">{form.age}</dd>
+                </div>
+                <div>
+                  <dt className="text-[#7E8C85]">Height</dt>
+                  <dd className="scoreboard text-[17px] text-[#F6F5F2] mt-0.5">
+                    {units === 'metric'
+                      ? `${form.height}cm`
+                      : `${form.heightFt}'${form.heightIn || 0}"`}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[#7E8C85]">Weight</dt>
+                  <dd className="scoreboard text-[17px] text-[#F6F5F2] mt-0.5">
+                    {form.weight}{units === 'metric' ? 'kg' : 'lb'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[#7E8C85]">BMI</dt>
+                  <dd className="scoreboard text-[17px] text-[#F6F5F2] mt-0.5">
+                    {plan.metrics.bmi}
+                    <span className="ml-2 text-[12px] font-semibold text-[#A9B5AE]">
+                      {plan.metrics.bmi_category}
+                    </span>
+                  </dd>
+                </div>
+                {issuedAt && (
+                  <div>
+                    <dt className="text-[#7E8C85]">Issued</dt>
+                    <dd className="scoreboard text-[17px] text-[#F6F5F2] mt-0.5">
+                      {issuedAt.toLocaleDateString()}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+
+              <button onClick={() => setEditing(true)}
+                className="no-print mt-6 text-[12px] font-bold text-[#FF5A1F] hover:underline">
+                Change your details
+              </button>
             </div>
           )}
         </div>
@@ -934,21 +1383,21 @@ export default function App() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-6">
                   <Field id="age" label="Age">
                     <input id="age" name="age" type="number" required min={13} max={100}
-                      placeholder="28" value={form.age} onChange={change} className={inputClass} />
+                      placeholder="28" value={form.age} onChange={change} className={numberInputClass} />
                   </Field>
 
                   {units === 'metric' ? (
                     <Field id="height" label="Height" hint="centimetres">
                       <input id="height" name="height" type="number" required min={100} max={250}
-                        placeholder="175" value={form.height} onChange={change} className={inputClass} />
+                        placeholder="175" value={form.height} onChange={change} className={numberInputClass} />
                     </Field>
                   ) : (
                     <Field id="heightFt" label="Height" hint="feet and inches">
                       <div className="flex gap-2">
                         <input id="heightFt" name="heightFt" type="number" required min={3} max={8}
-                          placeholder="5" value={form.heightFt} onChange={change} className={inputClass} />
+                          placeholder="5" value={form.heightFt} onChange={change} className={numberInputClass} />
                         <input id="heightIn" name="heightIn" type="number" min={0} max={11}
-                          placeholder="9" value={form.heightIn} onChange={change} className={inputClass} />
+                          placeholder="9" value={form.heightIn} onChange={change} className={numberInputClass} />
                       </div>
                     </Field>
                   )}
@@ -956,7 +1405,7 @@ export default function App() {
                   <Field id="weight" label="Weight" hint={units === 'metric' ? 'kilograms' : 'pounds'}>
                     <input id="weight" name="weight" type="number" required step="0.1"
                       placeholder={units === 'metric' ? '70' : '154'}
-                      value={form.weight} onChange={change} className={inputClass} />
+                      value={form.weight} onChange={change} className={numberInputClass} />
                   </Field>
 
                   <Field id="gender" label="Gender">
@@ -1024,20 +1473,46 @@ export default function App() {
               </form>
             </div>
 
-            {/* how it works */}
-            <div className="grid md:grid-cols-3 gap-5 mt-14">
-              {STEPS.map((s) => (
-                <div key={s.n} className="lift bg-white rounded-2xl border border-[#E3E1DA] p-6">
-                  <span className="figure text-[13px] text-[#FF5A1F]">{s.n}</span>
-                  <h3 className="text-[15px] font-extrabold mt-3">{s.title}</h3>
-                  <p className="text-[13px] text-[#6E756F] leading-relaxed mt-2">{s.body}</p>
-                </div>
-              ))}
+            {/* Three steps in order, so they sit as markers along one line
+                rather than three identical cards that imply no sequence. */}
+            <div className="mt-16">
+              <div className="h-px bg-[#D9D6CD]" />
+              <ol className="grid md:grid-cols-3 gap-x-8 gap-y-10">
+                {STEPS.map((step) => (
+                  <li key={step.n} className="relative pt-6">
+                    <span className="absolute top-0 left-0 w-[2px] h-4 bg-[#FF5A1F]" aria-hidden="true" />
+                    <span className="scoreboard text-[13px] text-[#FF5A1F]">{step.n}</span>
+                    <h3 className="text-[15px] font-extrabold mt-2">{step.title}</h3>
+                    <p className="text-[13px] text-[#6E756F] leading-relaxed mt-2">{step.body}</p>
+                  </li>
+                ))}
+              </ol>
             </div>
 
+            {/* Something to play with before anyone is asked to fill in a
+                form. Everyone has wondered what a chocolate bar costs, and
+                no sport knowledge is needed to find out. */}
+            <section className="mt-20 pt-16 border-t border-[#D9D6CD]">
+              <h2 className="text-[22px] md:text-[30px] font-extrabold tracking-[-0.025em] mb-8">
+                What does it actually cost to eat?
+              </h2>
+              <div className="bg-[#0E241F] rounded-[22px] p-6 md:p-9 text-[#F6F5F2]">
+                <BurnPanel />
+              </div>
+            </section>
+
+            <section className="mt-20">
+              <h2 className="text-[22px] md:text-[30px] font-extrabold tracking-[-0.025em] mb-8">
+                Three kinds of work, one week
+              </h2>
+              <div className="text-[#F6F5F2]">
+                <DisciplineCards />
+              </div>
+            </section>
+
             {/* the working behind the numbers */}
-            <section className="mt-16">
-              <h2 className="text-[11px] font-bold text-[#6E756F] mb-7">
+            <section className="mt-20">
+              <h2 className="text-[22px] font-extrabold tracking-[-0.02em] mb-8">
                 How your numbers are worked out
               </h2>
               <div className="grid md:grid-cols-2 gap-x-10 gap-y-9">
@@ -1050,7 +1525,7 @@ export default function App() {
               </div>
             </section>
 
-            <QuoteBand quote={quote} />
+            <ClosingNote />
           </section>
         )}
 
@@ -1065,7 +1540,7 @@ export default function App() {
           <div className="relative z-10 pb-8">
 
             {plan.warnings?.length > 0 && (
-              <div className="rise -mt-12 mb-10 bg-[#FDF5EE] border border-[#E8D5C2] rounded-2xl p-6 print-break">
+              <div className="-mt-12 mb-10 bg-[#FDF5EE] border border-[#E8D5C2] rounded-2xl p-6 print-break">
                 <h2 className="text-[12px] font-extrabold text-[#A8521C] mb-3">Read this first</h2>
                 <ul className="space-y-2.5">
                   {plan.warnings.map((w, i) => (
@@ -1080,44 +1555,20 @@ export default function App() {
               </div>
             )}
 
-            <section className={`rise bg-white rounded-2xl border border-[#E3E1DA] p-6 md:p-9 print-break ${
+            {/* Energy and macros share one band because they answer one
+                question: what the day's calories are, and what they are made
+                of. Splitting them into two cards implied two topics. */}
+            <section className={`bg-white rounded-2xl border border-[#E3E1DA] p-6 md:p-9 print-break ${
               plan.warnings?.length ? '' : '-mt-12'}`}>
-              <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-10 md:gap-14 items-start">
-                <div>
-                  <p className="text-[11px] font-bold text-[#6E756F] mb-4">Eat each day</p>
-                  <div className="flex items-end gap-3">
-                    <p className="figure text-[68px] md:text-[84px] leading-[0.8]">{animatedCalories}</p>
-                    <p className="text-[14px] text-[#6E756F] pb-2.5 font-semibold">kcal</p>
-                  </div>
-
-                  <div className="mt-8 space-y-2.5 text-[12.5px] tnum">
-                    <div className="flex justify-between border-b border-[#EDEBE5] pb-2.5">
-                      <span className="text-[#6E756F]">Resting burn</span>
-                      <span className="font-bold">{plan.metrics.bmr}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-[#EDEBE5] pb-2.5">
-                      <span className="text-[#6E756F]">With your activity</span>
-                      <span className="font-bold">{plan.metrics.tdee}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#6E756F]">
-                        {calories >= plan.metrics.tdee ? 'Surplus' : 'Deficit'}
-                      </span>
-                      <span className="font-bold text-[#FF5A1F]">
-                        {calories >= plan.metrics.tdee ? '+' : '-'}
-                        {Math.abs(calories - plan.metrics.tdee)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="md:pt-7">
-                  <MacroBar macros={plan.nutrition.macros} calories={calories} />
+              <div className="grid md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-10 md:gap-14 items-start">
+                <EnergyScale bmr={plan.metrics.bmr} tdee={plan.metrics.tdee} target={calories} />
+                <div className="md:pt-2">
+                  <MacroLanes macros={plan.nutrition.macros} calories={calories} />
                 </div>
               </div>
             </section>
 
-            <section className="rise rise-1 mt-6 bg-white rounded-2xl border border-[#E3E1DA] p-6 md:p-9 print-break">
+            <section className="mt-6 bg-white rounded-2xl border border-[#E3E1DA] p-6 md:p-9 print-break">
               <h2 className="text-[15px] font-extrabold mb-6">A day of eating</h2>
               <div>
                 {Object.entries(plan.nutrition.meals).map(([meal, description], i, arr) => (
@@ -1126,8 +1577,11 @@ export default function App() {
                       i < arr.length - 1 ? 'border-b border-[#EDEBE5]' : ''}`}>
                     <span className="capitalize text-[13px] font-extrabold">{meal}</span>
                     <span className="text-[14px] text-[#454B47] leading-relaxed">{description}</span>
-                    <span className="text-[12.5px] font-bold text-[#6E756F] tnum whitespace-nowrap col-start-2 md:col-start-3">
-                      ~{Math.round(calories * (MEAL_SHARE[meal] ?? 0))} kcal
+                    <span className="text-[12.5px] text-[#6E756F] whitespace-nowrap col-start-2 md:col-start-3">
+                      <span className="scoreboard text-[15px] text-[#141815]">
+                        {Math.round(calories * (MEAL_SHARE[meal] ?? 0))}
+                      </span>
+                      <span className="ml-1">kcal</span>
                     </span>
                   </div>
                 ))}
@@ -1145,65 +1599,39 @@ export default function App() {
               />
             </section>
 
-            <section className="rise rise-2 mt-6 print-break">
+            {/* The training week is a start list: the day, the session, and
+                a mark you make once it is done. */}
+            <section className="mt-6 print-break">
               <div className="pine-grid text-[#F6F5F2] rounded-2xl overflow-hidden print-plain">
-                <div className="px-6 md:px-9 pt-7 pb-5 flex items-baseline justify-between gap-4">
+                <div className="px-6 md:px-9 pt-7 pb-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <h2 className="text-[15px] font-extrabold">Your training week</h2>
                   <span className="text-[11px] text-[#A9B5AE] font-semibold">
-                    {ACTIVITY_LEVELS.find((a) => a.value === form.activity_level)?.label}
+                    Built for someone who trains{' '}
+                    {ACTIVITY_LEVELS.find((a) => a.value === form.activity_level)?.hint
+                      ?.toLowerCase() ?? 'regularly'}
                   </span>
                 </div>
 
                 <div className="no-print px-6 md:px-9 pb-5">
-                  <WeekTracker days={trainingDays} done={progress.done} onReset={progress.reset} />
+                  <WeekTracker days={trainingDays} matrix={plan.training_matrix}
+                    done={progress.done} onReset={progress.reset} />
                 </div>
 
-                <div className="px-6 md:px-9 pb-7">
-                  {Object.entries(plan.training_matrix).map(([day, workout], i, arr) => {
-                    const isDone = Boolean(progress.done[day]);
-                    return (
-                      <div key={day}
-                        className={`grid grid-cols-[28px_38px_1fr] md:grid-cols-[28px_96px_1fr] gap-4 py-4 items-start ${
-                          i < arr.length - 1 ? 'border-b border-white/10' : ''}`}>
-                        <button onClick={() => progress.toggle(day)}
-                          aria-pressed={isDone}
-                          aria-label={`Mark ${day} as done`}
-                          className={`no-print mt-0.5 w-[18px] h-[18px] rounded-[5px] border flex items-center justify-center transition-colors ${
-                            isDone ? 'bg-[#FF5A1F] border-[#FF5A1F]'
-                                   : 'border-white/30 hover:border-white/60'}`}>
-                          {isDone && (
-                            <svg viewBox="0 0 12 12" className="w-3 h-3" aria-hidden="true">
-                              <path d="M2.5 6.2l2.3 2.3 4.7-5" fill="none" stroke="#10231F"
-                                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          )}
-                        </button>
-                        <span className={`text-[11px] font-extrabold pt-0.5 transition-colors ${
-                          isDone ? 'text-[#5E6E66]' : 'text-[#FF5A1F]'}`}>
-                          <span className="md:hidden">{day.slice(0, 3)}</span>
-                          <span className="hidden md:inline">{day}</span>
-                        </span>
-                        <span className={`text-[14px] leading-relaxed transition-colors ${
-                          isDone ? 'text-[#5E6E66] line-through' : 'text-[#DDE3DF]'}`}>
-                          {workout}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                <SessionBoard days={trainingDays} matrix={plan.training_matrix}
+                  done={progress.done} onToggle={progress.toggle} />
 
                 <TrainingGuide />
               </div>
             </section>
 
             {/* projection */}
-            <section className="rise rise-3 mt-6 bg-white rounded-2xl border border-[#E3E1DA] p-6 md:p-9 print-break">
+            <section className="mt-6 bg-white rounded-2xl border border-[#E3E1DA] p-6 md:p-9 print-break">
               <ProjectionChart startKg={startKg} tdee={plan.metrics.tdee}
                 target={calories} units={units} />
             </section>
 
             {(plan.assumptions?.length > 0 || plan.reference_guidance) && (
-              <section className="rise rise-3 mt-6 bg-white rounded-2xl border border-[#E3E1DA] p-6 md:p-9">
+              <section className="mt-6 bg-white rounded-2xl border border-[#E3E1DA] p-6 md:p-9">
                 {plan.assumptions?.length > 0 && (
                   <div className={plan.reference_guidance ? 'mb-7 pb-7 border-b border-[#EDEBE5]' : ''}>
                     <h2 className="text-[12px] font-extrabold text-[#6E756F] mb-2.5">What was assumed</h2>
@@ -1232,7 +1660,7 @@ export default function App() {
               </section>
             )}
 
-            <QuoteBand quote={quote} />
+            <ClosingNote />
           </div>
         )}
 
@@ -1242,11 +1670,12 @@ export default function App() {
             <Mark className="w-5 h-5 text-[#141815]" />
             <span className="text-[13px] font-extrabold">OptiFit</span>
           </div>
-          <p className="text-[11px] text-[#9DA29E] leading-relaxed max-w-[680px]">
-            Targets come from the Mifflin-St Jeor equation and standard activity multipliers.
-            Meal and training templates are general, not individually programmed. This is not
-            medical advice. Talk to a doctor or a registered dietitian before making significant
-            changes, particularly if you have a health condition.
+          <p className="text-[13px] text-[#454B47] font-semibold leading-relaxed max-w-[680px]">
+            Built by a sprinter who thinks fitness is the one currency you cannot borrow.
+          </p>
+          <p className="text-[11px] text-[#9DA29E] leading-relaxed max-w-[680px] mt-3">
+            Not medical advice. Talk to a doctor or a registered dietitian before any
+            significant change.
             {profileId && <span className="no-print"> Your plan stays at this link.</span>}
           </p>
         </footer>
