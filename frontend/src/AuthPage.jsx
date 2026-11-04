@@ -1,10 +1,25 @@
 import React, { useState } from 'react';
 import { describeAuthError, useAuth } from './lib/auth';
 
-const QUOTE = {
-  text: 'Let food be thy medicine and medicine be thy food.',
-  who: 'Hippocrates',
-};
+/**
+ * The same 100m velocity profile the main app opens with, so signing in does
+ * not feel like a different product.
+ */
+function VelocityCurve({ className = '' }) {
+  return (
+    <svg className={className} viewBox="0 0 1200 170" fill="none"
+      preserveAspectRatio="none" aria-hidden="true">
+      {Array.from({ length: 11 }, (_, i) => (
+        <line key={i} x1={i * 120} y1="0" x2={i * 120} y2="170"
+          stroke="#F6F5F2" strokeOpacity={i % 3 === 0 ? 0.13 : 0.06} strokeWidth="1" />
+      ))}
+      <path className="velocity-draw"
+        d="M0 158 C 60 142, 140 94, 240 64 C 330 38, 420 27, 540 25
+           C 700 23, 880 33, 1200 53"
+        stroke="#FF5A1F" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function Mark({ className = '' }) {
   return (
@@ -111,14 +126,17 @@ export default function AuthPage({ initialMode = 'signin', onDone, onSkip }) {
 
       {/* ------------------------------------------------- left: brand panel */}
       <div className="pine-grid pine-grid-drift text-[#F6F5F2] px-6 md:px-12 py-10 md:py-14
-                      flex flex-col justify-between min-h-[260px] md:min-h-screen">
-        <button onClick={onSkip} className="flex items-center gap-2.5 self-start group"
+                      flex flex-col justify-between min-h-[260px] md:min-h-screen
+                      relative overflow-hidden">
+        <VelocityCurve className="velocity-mask pointer-events-none absolute left-0 right-0
+                                  bottom-0 h-[170px] w-full opacity-40" />
+        <button onClick={onSkip} className="relative flex items-center gap-2.5 self-start group"
           aria-label="OptiFit home">
           <Mark className="w-7 h-7 text-[#F6F5F2] transition-transform group-hover:scale-105" />
           <span className="text-[17px] font-extrabold tracking-[-0.02em]">OptiFit</span>
         </button>
 
-        <div className="hidden md:block max-w-[420px] py-14">
+        <div className="relative hidden md:block max-w-[420px] py-14">
           <h2 className="text-[34px] font-extrabold leading-[1.05] tracking-[-0.03em] balance">
             Keep every plan in one place.
           </h2>
@@ -136,14 +154,11 @@ export default function AuthPage({ initialMode = 'signin', onDone, onSkip }) {
           </ul>
         </div>
 
-        <figure className="hidden md:block">
-          <blockquote className="text-[15px] text-[#A9B5AE] leading-relaxed max-w-[360px]">
-            {QUOTE.text}
-          </blockquote>
-          <figcaption className="text-[12px] font-bold text-[#7E8C85] mt-2.5">
-            {QUOTE.who}
-          </figcaption>
-        </figure>
+        <p className="relative hidden md:block text-[13px] text-[#7E8C85]
+                      leading-relaxed max-w-[360px]">
+          An account is only storage. Everything the calculator does works
+          without one.
+        </p>
       </div>
 
       {/* ------------------------------------------------------- right: form */}

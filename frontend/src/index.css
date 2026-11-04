@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Black&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Archivo+Black&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -52,24 +52,10 @@ body {
   to   { background-position: 44px 44px, 44px 44px; }
 }
 
-/* Fades the trace out at both edges so it never ends on a hard stop. */
+/* Fades a trace out at both edges so it never ends on a hard stop. */
 .pulse-mask {
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
   mask-image: linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
-}
-
-/* Heart trace: the stroke draws itself, pauses, repeats. */
-.ecg path {
-  stroke-dasharray: 1200;
-  stroke-dashoffset: 1200;
-  animation: trace 4.5s cubic-bezier(0.45, 0, 0.3, 1) infinite;
-}
-@keyframes trace {
-  0%   { stroke-dashoffset: 1200; opacity: 0; }
-  8%   { opacity: 1; }
-  55%  { stroke-dashoffset: 0; opacity: 1; }
-  85%  { stroke-dashoffset: 0; opacity: 0.12; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
 }
 
 /* Macro bars in the hero specimen grow once on load. */
@@ -90,25 +76,8 @@ body {
   50%      { transform: translateY(-9px); }
 }
 
-@keyframes rise {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: none; }
-}
-.rise { animation: rise 500ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.rise-1 { animation-delay: 60ms; }
-.rise-2 { animation-delay: 120ms; }
-.rise-3 { animation-delay: 180ms; }
-
 .lift { transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms; }
 .lift:hover { transform: translateY(-2px); }
-
-@media (prefers-reduced-motion: reduce) {
-  .rise, .rise-1, .rise-2, .rise-3, .float,
-  .pine-grid-drift, .grow-bar { animation: none; }
-  .draw-line { animation: none; stroke-dashoffset: 0; }
-  .ecg path { animation: none; stroke-dashoffset: 0; opacity: 0.5; }
-  *, *::before, *::after { transition-duration: 0.01ms !important; }
-}
 
 :focus-visible { outline: 2px solid var(--flame); outline-offset: 2px; }
 
@@ -119,6 +88,194 @@ select {
   background-position: right 0.7rem center;
   background-size: 1rem;
   padding-right: 2.25rem;
+}
+
+/* ==================================================================
+   Track additions
+   ================================================================== */
+
+/* Figures set the way a timing board sets them: heavy, tight, every digit
+   the same width so columns of numbers hold still as values change. */
+.scoreboard {
+  font-family: 'Archivo Black', 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.035em;
+}
+
+/* ------------------------------------------------- hero: depth and speed */
+.lane-sweep { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.lane-sweep::before {
+  content: "";
+  position: absolute;
+  inset: -20% -10%;
+  background: repeating-linear-gradient(
+    102deg, transparent 0 78px, rgba(246, 245, 242, 0.08) 78px 80px);
+  animation: lane-sweep 2.6s linear infinite;
+}
+@keyframes lane-sweep { to { transform: translateX(-80px); } }
+
+.glow { position: absolute; border-radius: 50%; filter: blur(90px);
+  opacity: 0.5; pointer-events: none; }
+.glow-a { width: 520px; height: 520px; background: rgba(255, 90, 31, 0.2);
+  top: -180px; right: -120px; animation: glow-drift 14s ease-in-out infinite alternate; }
+.glow-b { width: 420px; height: 420px; background: rgba(47, 111, 94, 0.25);
+  bottom: -160px; left: -120px;
+  animation: glow-drift 18s ease-in-out infinite alternate-reverse; }
+@keyframes glow-drift { to { transform: translate3d(40px, 30px, 0) scale(1.12); } }
+
+.watermark {
+  position: absolute; right: -4vw; top: 14%;
+  font-size: clamp(200px, 32vw, 440px); line-height: 0.72;
+  color: transparent; -webkit-text-stroke: 2px rgba(246, 245, 242, 0.05);
+  pointer-events: none; user-select: none;
+}
+
+/* the headline rising line by line from behind its own mask */
+.ln { display: block; overflow: hidden; }
+.ln > span { display: block;
+  animation: line-up 0.95s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.ln-1 > span { animation-delay: 0.08s; }
+.ln-2 > span { animation-delay: 0.16s; }
+@keyframes line-up { from { transform: translateY(102%); } }
+
+.fade-up { animation: fade-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.fade-1 { animation-delay: 0.3s; }
+.fade-2 { animation-delay: 0.42s; }
+.fade-3 { animation-delay: 0.55s; }
+@keyframes fade-up { from { opacity: 0; transform: translateY(10px); } }
+
+.kick-line { display: block; width: 26px; height: 2px; background: var(--flame);
+  transform-origin: left;
+  animation: kick 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes kick { from { transform: scaleX(0); } }
+
+/* the call to action, with a ring that keeps leaving it */
+.go-ring { position: relative; }
+.go-ring::after {
+  content: ""; position: absolute; inset: -3px; border-radius: 15px;
+  border: 2px solid var(--flame); opacity: 0;
+  animation: go-ring 2.6s ease-out infinite;
+}
+@keyframes go-ring {
+  0% { opacity: 0.7; transform: scale(1); }
+  70%, 100% { opacity: 0; transform: scale(1.14); }
+}
+
+/* ------------------------------------------------ the 100m velocity curve */
+.velocity-draw { stroke-dasharray: 1700; stroke-dashoffset: 1700;
+  animation: velocity-run 2200ms cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+@keyframes velocity-run { to { stroke-dashoffset: 0; } }
+.velocity-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 86%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 86%, transparent);
+}
+
+/* -------------------------------------------------------------- the runner
+   Limbs are nested groups rotating about the joint above them: the shin
+   about the knee, the forearm about the elbow. The phases are offset so the
+   arms drive opposite the legs, which is what makes a run read as a run.
+   Heavy round caps let every joint resolve on its own, so the figure holds
+   together at any limb angle. */
+.runner g { transform-box: view-box; }
+.lf { stroke: var(--flame); stroke-linecap: round; fill: none; }
+.lb { stroke: #27463D; stroke-linecap: round; fill: none; }
+.w-thigh { stroke-width: 15; }
+.w-shin  { stroke-width: 12; }
+.w-arm   { stroke-width: 11; }
+.w-fore  { stroke-width: 9.5; }
+.w-torso { stroke-width: 19; }
+
+.rn-bob { animation: rn-bob var(--cad, 0.46s) ease-in-out infinite; }
+@keyframes rn-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.thighA { transform-origin: 96px 112px; animation: thighA var(--cad, 0.46s) linear infinite; }
+.shinA  { transform-origin: 96px 152px; animation: shinA  var(--cad, 0.46s) linear infinite; }
+.thighB { transform-origin: 96px 112px; animation: thighB var(--cad, 0.46s) linear infinite; }
+.shinB  { transform-origin: 96px 152px; animation: shinB  var(--cad, 0.46s) linear infinite; }
+.armA   { transform-origin: 106px 64px; animation: armA   var(--cad, 0.46s) linear infinite; }
+.foreA  { transform-origin: 106px 94px; animation: foreA  var(--cad, 0.46s) linear infinite; }
+.armB   { transform-origin: 106px 64px; animation: armB   var(--cad, 0.46s) linear infinite; }
+.foreB  { transform-origin: 106px 94px; animation: foreB  var(--cad, 0.46s) linear infinite; }
+
+@keyframes thighA { 0% { transform: rotate(-52deg); } 25% { transform: rotate(-4deg); }
+  50% { transform: rotate(41deg); } 75% { transform: rotate(8deg); }
+  100% { transform: rotate(-52deg); } }
+@keyframes shinA { 0% { transform: rotate(78deg); } 25% { transform: rotate(16deg); }
+  50% { transform: rotate(2deg); } 75% { transform: rotate(92deg); }
+  100% { transform: rotate(78deg); } }
+@keyframes thighB { 0% { transform: rotate(41deg); } 25% { transform: rotate(8deg); }
+  50% { transform: rotate(-52deg); } 75% { transform: rotate(-4deg); }
+  100% { transform: rotate(41deg); } }
+@keyframes shinB { 0% { transform: rotate(2deg); } 25% { transform: rotate(92deg); }
+  50% { transform: rotate(78deg); } 75% { transform: rotate(16deg); }
+  100% { transform: rotate(2deg); } }
+@keyframes armA { 0% { transform: rotate(46deg); } 50% { transform: rotate(-42deg); }
+  100% { transform: rotate(46deg); } }
+@keyframes foreA { 0% { transform: rotate(-68deg); } 50% { transform: rotate(-96deg); }
+  100% { transform: rotate(-68deg); } }
+@keyframes armB { 0% { transform: rotate(-42deg); } 50% { transform: rotate(46deg); }
+  100% { transform: rotate(-42deg); } }
+@keyframes foreB { 0% { transform: rotate(-96deg); } 50% { transform: rotate(-68deg); }
+  100% { transform: rotate(-96deg); } }
+
+/* --------------------------------------------------------------- controls */
+.range-track {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 5px;
+  border-radius: 3px; background: rgba(246, 245, 242, 0.13);
+  outline: none; cursor: pointer;
+}
+.range-track::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 22px; height: 22px;
+  border-radius: 50%; background: var(--flame); cursor: grab; border: 3px solid #0A1A17;
+  box-shadow: 0 0 0 1px var(--flame), 0 4px 14px -2px rgba(255, 90, 31, 0.67);
+  transition: transform 0.15s;
+}
+.range-track::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.18); }
+.range-track::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%; background: var(--flame);
+  cursor: grab; border: 3px solid #0A1A17; box-shadow: 0 0 0 1px var(--flame);
+}
+
+.flash-val { animation: flash-val 0.45s ease-out; }
+@keyframes flash-val { 0% { color: #FF7A3D; } 100% { color: inherit; } }
+
+/* a bar driven up and down, plates and all */
+.rig-press { animation: rig-press 2.1s cubic-bezier(0.45, 0, 0.3, 1) infinite; }
+@keyframes rig-press {
+  0%, 100% { transform: translateY(22px); }
+  45%, 55% { transform: translateY(-14px); }
+}
+
+/* A breath, slow enough to actually follow. Rings travel outward and fade
+   rather than stacking as filled discs, which previously mixed three
+   translucent fills into a single brown shape. */
+.breathe circle { transform-origin: 48px 48px; }
+.breathe .b1 { animation: breathe 4.8s ease-out infinite; }
+.breathe .b2 { animation: breathe 4.8s ease-out infinite 1.6s; }
+.breathe .b3 { animation: breathe 4.8s ease-out infinite 3.2s; }
+@keyframes breathe {
+  0%   { transform: scale(0.22); opacity: 0; }
+  12%  { opacity: 0.9; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+/* ===================================================================
+   Nobody has to move. One block for everything, placed last so it wins.
+   =================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .float, .pine-grid-drift, .grow-bar,
+  .lane-sweep::before, .glow-a, .glow-b,
+  .rig-press, .breathe circle, .go-ring::after,
+  .ln > span, .fade-up, .kick-line, .flash-val { animation: none; }
+  .runner g { animation: none !important; }
+  .draw-line { animation: none; stroke-dashoffset: 0; }
+  .velocity-draw { animation: none; stroke-dashoffset: 0; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; }
 }
 
 @media print {
@@ -132,4 +289,6 @@ select {
   }
   .print-plain * { color: #141815 !important; }
   .print-break { break-inside: avoid; }
+  .velocity-draw { animation: none; stroke-dashoffset: 0; }
+  .lane-sweep, .glow, .watermark { display: none; }
 }
